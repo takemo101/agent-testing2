@@ -13,11 +13,11 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::{timeout, Duration};
 
-use pomodoro_timer::cli::client::IpcClient;
-use pomodoro_timer::cli::commands::StartArgs;
-use pomodoro_timer::daemon::ipc::{IpcServer, RequestHandler};
-use pomodoro_timer::daemon::timer::{TimerEngine, TimerEvent};
-use pomodoro_timer::types::PomodoroConfig;
+use pomodoro::cli::client::IpcClient;
+use pomodoro::cli::commands::StartArgs;
+use pomodoro::daemon::ipc::{IpcServer, RequestHandler};
+use pomodoro::daemon::timer::{TimerEngine, TimerEvent};
+use pomodoro::types::PomodoroConfig;
 
 // ============================================================================
 // Test Helpers
@@ -66,7 +66,6 @@ async fn run_single_request_server(
 async fn tc_i_001_timer_start_via_ipc() {
     // Setup
     let socket_path = create_temp_socket_path();
-    let server = IpcServer::new(&socket_path).unwrap();
     let (engine, _rx) = create_engine();
     let handler = RequestHandler::new(engine);
 
