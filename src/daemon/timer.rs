@@ -958,7 +958,7 @@ mod tests {
 
             // Should have received approximately 3 tick events (±1 for timing variance)
             assert!(
-                tick_count >= 2 && tick_count <= 4,
+                (2..=4).contains(&tick_count),
                 "Expected ~3 ticks, got {}",
                 tick_count
             );
