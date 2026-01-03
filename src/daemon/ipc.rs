@@ -331,6 +331,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::daemon::timer::TimerEvent;
+    use crate::types::PomodoroConfig;
 
     // ------------------------------------------------------------------------
     // Helper functions
