@@ -48,6 +48,18 @@ async fn handle_single_request(server: &IpcServer, handler: &RequestHandler) {
     IpcServer::send_response(&mut stream, &response).await.unwrap();
 }
 
+/// Runs multiple request-response cycles (for retry handling).
+async fn handle_multiple_requests(server: &IpcServer, handler: &RequestHandler, count: usize) {
+    for _ in 0..count {
+        if let Ok(mut stream) = server.accept().await {
+            if let Ok(request) = IpcServer::receive_request(&mut stream).await {
+                let response = handler.handle(request).await;
+                let _ = IpcServer::send_response(&mut stream, &response).await;
+            }
+        }
+    }
+}
+
 // ============================================================================
 // TC-I-001: Timer Start via IPC
 // ============================================================================
@@ -196,18 +208,23 @@ async fn tc_i_002_timer_pause_via_ipc() {
 }
 
 /// TC-I-002 variant: Pause when timer is not running (error case)
+///
+/// Note: The IPC client has retry logic (3 retries), so the server needs
+/// to handle all retry attempts. Error responses are also retried by the
+/// current client implementation.
 #[tokio::test]
 async fn tc_i_002_timer_pause_when_not_running() {
     let socket_path = create_temp_socket_path();
     let (engine, _rx) = create_engine();
     let handler = Arc::new(RequestHandler::new(engine));
 
-    // Create server first, then spawn handler
+    // Create server that handles multiple requests (for retries)
     let server = Arc::new(IpcServer::new(&socket_path).unwrap());
     let server_clone = server.clone();
     let handler_clone = handler.clone();
     let server_handle = tokio::spawn(async move {
-        handle_single_request(&server_clone, &handler_clone).await;
+        // Handle up to 3 requests (for retry logic)
+        handle_multiple_requests(&server_clone, &handler_clone, 3).await;
     });
 
     // Small delay for server to be ready
@@ -225,7 +242,7 @@ async fn tc_i_002_timer_pause_when_not_running() {
         error_msg
     );
 
-    let _ = server_handle.await;
+    server_handle.abort();
 }
 
 // ============================================================================
