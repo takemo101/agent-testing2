@@ -120,7 +120,7 @@ impl NotificationManager {
 
         // Create and set delegate
         let delegate = NotificationDelegate::new(mtm, sender);
-        NotificationCenter::set_delegate(&delegate.as_protocol());
+        NotificationCenter::set_delegate(&NotificationDelegate::as_protocol(&delegate));
 
         // Register notification categories
         let categories = create_categories();
