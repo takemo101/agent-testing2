@@ -30,6 +30,17 @@ thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# UUID generation (for notification request IDs)
+uuid = { version = "1.11", features = ["v4"] }
+
+# macOS-specific dependencies for notification system
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSError", "NSSet", "NSArray"] }
+# Use default features - includes all notification types we need
+objc2-user-notifications = "0.3"
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"

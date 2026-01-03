@@ -6,12 +6,23 @@
 //! - IPC server/client for daemon-CLI communication
 //! - CLI command parsing and display utilities
 //! - Type definitions for configuration and state
+//! - Native macOS notification system (macOS only)
 
 pub mod cli;
 pub mod daemon;
 pub mod types;
 
+// macOS-specific notification system
+#[cfg(target_os = "macos")]
+pub mod notification;
+
 // Re-export commonly used types for convenience
 pub use types::{
     IpcRequest, IpcResponse, PomodoroConfig, ResponseData, StartParams, TimerPhase, TimerState,
+};
+
+// Re-export notification types on macOS
+#[cfg(target_os = "macos")]
+pub use notification::{
+    NotificationActionEvent, NotificationError, NotificationManager, NotificationType,
 };
