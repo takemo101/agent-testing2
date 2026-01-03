@@ -15,6 +15,7 @@ pub fn create_notification_request(
 }
 
 #[must_use]
+#[allow(dead_code)]
 pub fn create_notification_request_with_id(
     identifier: &str,
     content: &UNMutableNotificationContent,

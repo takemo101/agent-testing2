@@ -80,8 +80,7 @@ define_class!(
             response: &UNNotificationResponse,
             completion_handler: &Block<dyn Fn()>,
         ) {
-            // Get the action identifier
-            let action_identifier = unsafe { response.actionIdentifier() };
+            let action_identifier = response.actionIdentifier();
             let action_str = action_identifier.to_string();
 
             // Map action identifier to event
