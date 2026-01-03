@@ -41,6 +41,10 @@ objc2-foundation = { version = "0.3", features = ["NSString", "NSError", "NSSet"
 # Use default features - includes all notification types we need
 objc2-user-notifications = "0.3"
 
+# Menu bar UI (tray icon) - macOS native
+tray-icon = "0.21"
+muda = "0.18"
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"
