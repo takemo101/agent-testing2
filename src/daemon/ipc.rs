@@ -14,7 +14,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 
-use crate::types::{IpcRequest, IpcResponse, PomodoroConfig, ResponseData, StartParams};
+use crate::types::{IpcRequest, IpcResponse, ResponseData, StartParams};
 
 use super::timer::TimerEngine;
 
