@@ -4,7 +4,7 @@
 //! Pomodoro timer. It supports both macOS system sounds and embedded
 //! fallback sounds.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::error::SoundError;
 
@@ -27,12 +27,52 @@ pub enum SoundSource {
 
 impl SoundSource {
     /// Creates a new system sound source.
+    ///
+    /// # Note
+    ///
+    /// This constructor does not validate the path. Use `system_validated` for
+    /// path validation against allowed directories.
     #[must_use]
     pub fn system(name: impl Into<String>, path: impl Into<PathBuf>) -> Self {
         Self::System {
             name: name.into(),
             path: path.into(),
         }
+    }
+
+    /// Creates a new system sound source with path validation.
+    ///
+    /// Only allows paths within the system sound directories:
+    /// - `/System/Library/Sounds`
+    /// - `/Library/Sounds`
+    ///
+    /// # Errors
+    ///
+    /// Returns `SoundError::InvalidPath` if the path is outside allowed directories.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use pomodoro::sound::SoundSource;
+    ///
+    /// // Valid system sound path
+    /// let source = SoundSource::system_validated("Glass", "/System/Library/Sounds/Glass.aiff");
+    /// assert!(source.is_ok());
+    ///
+    /// // Invalid path (outside allowed directories)
+    /// let source = SoundSource::system_validated("evil", "/tmp/evil.wav");
+    /// assert!(source.is_err());
+    /// ```
+    pub fn system_validated(
+        name: impl Into<String>,
+        path: impl Into<PathBuf>,
+    ) -> Result<Self, SoundError> {
+        let path = path.into();
+        validate_system_sound_path(&path)?;
+        Ok(Self::System {
+            name: name.into(),
+            path,
+        })
     }
 
     /// Creates a new embedded sound source.
@@ -73,6 +113,27 @@ impl SoundSource {
 
 /// Directories to search for system sounds, in order of priority.
 const SYSTEM_SOUND_DIRS: &[&str] = &["/System/Library/Sounds", "/Library/Sounds"];
+
+fn validate_system_sound_path(path: &Path) -> Result<(), SoundError> {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+
+    for allowed_dir in SYSTEM_SOUND_DIRS {
+        let allowed_path = PathBuf::from(allowed_dir);
+        if let Ok(canonical_allowed) = allowed_path.canonicalize() {
+            if canonical.starts_with(&canonical_allowed) {
+                return Ok(());
+            }
+        }
+        if canonical.starts_with(allowed_dir) {
+            return Ok(());
+        }
+    }
+
+    Err(SoundError::InvalidPath(format!(
+        "Path '{}' is not within allowed system sound directories",
+        path.display()
+    )))
+}
 
 /// Supported audio file extensions.
 const SUPPORTED_EXTENSIONS: &[&str] = &["aiff", "wav", "mp3", "m4a", "flac"];
@@ -231,8 +292,42 @@ mod tests {
 
     #[test]
     fn test_default_sound_names() {
-        // Verify we have default sounds to try
         assert!(!DEFAULT_SOUND_NAMES.is_empty());
         assert!(DEFAULT_SOUND_NAMES.contains(&"Glass"));
+    }
+
+    #[test]
+    fn test_system_validated_accepts_valid_paths() {
+        let result = SoundSource::system_validated("Glass", "/System/Library/Sounds/Glass.aiff");
+        assert!(result.is_ok());
+
+        let result = SoundSource::system_validated("Custom", "/Library/Sounds/Custom.wav");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_system_validated_rejects_invalid_paths() {
+        let result = SoundSource::system_validated("evil", "/tmp/evil.wav");
+        assert!(result.is_err());
+        if let Err(SoundError::InvalidPath(msg)) = result {
+            assert!(msg.contains("/tmp/evil.wav"));
+        } else {
+            panic!("Expected InvalidPath error");
+        }
+
+        let result = SoundSource::system_validated("home", "/Users/test/sound.wav");
+        assert!(result.is_err());
+
+        let result = SoundSource::system_validated("etc", "/etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_system_validated_rejects_path_traversal() {
+        let result = SoundSource::system_validated(
+            "traversal",
+            "/System/Library/Sounds/../../../etc/passwd",
+        );
+        assert!(result.is_err());
     }
 }

@@ -57,6 +57,55 @@ pub use error::SoundError;
 pub use player::{try_create_player, RodioSoundPlayer};
 pub use source::{discover_system_sounds, find_system_sound, get_default_sound, SoundSource};
 
+/// Trait for sound playback implementations.
+///
+/// This trait abstracts the sound playback functionality, allowing for
+/// different implementations (e.g., rodio-based, mock for testing).
+pub trait SoundPlayer {
+    /// Plays a sound from the given source.
+    ///
+    /// This method should be non-blocking; the sound plays in the background.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if playback fails.
+    fn play(&self, source: &SoundSource) -> Result<(), SoundError>;
+
+    /// Returns true if the audio system is available.
+    fn is_available(&self) -> bool;
+
+    /// Returns true if sound playback is disabled.
+    fn is_disabled(&self) -> bool;
+
+    /// Enables sound playback.
+    fn enable(&self);
+
+    /// Disables sound playback.
+    fn disable(&self);
+}
+
+impl SoundPlayer for RodioSoundPlayer {
+    fn play(&self, source: &SoundSource) -> Result<(), SoundError> {
+        RodioSoundPlayer::play(self, source)
+    }
+
+    fn is_available(&self) -> bool {
+        RodioSoundPlayer::is_available(self)
+    }
+
+    fn is_disabled(&self) -> bool {
+        RodioSoundPlayer::is_disabled(self)
+    }
+
+    fn enable(&self) {
+        RodioSoundPlayer::enable(self)
+    }
+
+    fn disable(&self) {
+        RodioSoundPlayer::disable(self)
+    }
+}
+
 /// Plays the default notification sound.
 ///
 /// This is a convenience function that creates a temporary player and plays

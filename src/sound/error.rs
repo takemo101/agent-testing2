@@ -28,6 +28,10 @@ pub enum SoundError {
     /// Generic sound playback error.
     #[error("サウンド再生エラー: {0}")]
     PlaybackError(String),
+
+    /// Invalid path (outside allowed directories).
+    #[error("無効なパス: {0}")]
+    InvalidPath(String),
 }
 
 impl SoundError {
@@ -40,7 +44,10 @@ impl SoundError {
     /// Returns true if this error is related to the audio file.
     #[must_use]
     pub fn is_file_error(&self) -> bool {
-        matches!(self, Self::FileNotFound(_) | Self::DecodeError(_))
+        matches!(
+            self,
+            Self::FileNotFound(_) | Self::DecodeError(_) | Self::InvalidPath(_)
+        )
     }
 
     /// Returns true if playback should fall back to embedded sound.
@@ -58,6 +65,7 @@ impl SoundError {
             Self::DecodeError(_) => "サウンドファイルが破損している可能性があります",
             Self::StreamError(_) => "オーディオ設定を確認してください",
             Self::PlaybackError(_) => "アプリケーションを再起動してください",
+            Self::InvalidPath(_) => "許可されたシステムサウンドディレクトリを使用してください",
         }
     }
 }
@@ -128,5 +136,17 @@ mod tests {
 
         let err = SoundError::PlaybackError("x".into());
         assert!(err.suggestion().contains("再起動"));
+
+        let err = SoundError::InvalidPath("x".into());
+        assert!(err.suggestion().contains("システムサウンドディレクトリ"));
+    }
+
+    #[test]
+    fn test_invalid_path_error() {
+        let err = SoundError::InvalidPath("/tmp/evil.wav".into());
+        assert!(err.to_string().contains("/tmp/evil.wav"));
+        assert!(err.is_file_error());
+        assert!(!err.is_device_error());
+        assert!(!err.should_fallback_to_embedded());
     }
 }
