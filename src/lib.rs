@@ -12,6 +12,7 @@
 
 pub mod cli;
 pub mod daemon;
+pub mod launchagent;
 pub mod menubar;
 pub mod sound;
 pub mod types;
@@ -41,4 +42,9 @@ pub use menubar::{
 pub use sound::{
     discover_system_sounds, get_default_sound, play_notification_sound, RodioSoundPlayer,
     SoundError, SoundSource,
+};
+
+// Re-export launchagent types
+pub use launchagent::{
+    install, is_installed, uninstall, LaunchAgentError, PomodoroLaunchAgent, ServiceStatus,
 };
