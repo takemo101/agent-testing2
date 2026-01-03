@@ -30,6 +30,31 @@ thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# UUID generation (for notification request IDs)
+uuid = { version = "1.11", features = ["v4"] }
+
+# macOS-specific dependencies for notification system
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSError", "NSSet", "NSArray"] }
+objc2-user-notifications = { version = "0.3", features = [
+    "UNUserNotificationCenter",
+    "UNNotificationContent",
+    "UNMutableNotificationContent",
+    "UNNotificationRequest",
+    "UNNotificationAction",
+    "UNNotificationCategory",
+    "UNNotificationSettings",
+    "UNNotificationResponse",
+    "UNNotification",
+    "UNNotificationSound",
+    "UNAuthorizationOptions",
+    "UNNotificationPresentationOptions",
+    "UNNotificationCategoryOptions",
+    "UNNotificationActionOptions",
+] }
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"
