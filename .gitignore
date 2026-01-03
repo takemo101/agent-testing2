@@ -1,1 +1,26 @@
+# Node.js
 node_modules/
+
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+*.dSYM/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
