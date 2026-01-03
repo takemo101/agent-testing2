@@ -47,6 +47,12 @@ objc2-user-notifications = "0.3"
 # Menu bar UI (tray icon) - macOS native
 tray-icon = "0.21"
 
+# Audio playback for sound notifications
+[dependencies.rodio]
+version = "0.21"
+default-features = false
+features = ["symphonia-all"]
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"
