@@ -12,4 +12,6 @@ pub mod daemon;
 pub mod types;
 
 // Re-export commonly used types for convenience
-pub use types::{IpcRequest, IpcResponse, PomodoroConfig, ResponseData, StartParams, TimerPhase, TimerState};
+pub use types::{
+    IpcRequest, IpcResponse, PomodoroConfig, ResponseData, StartParams, TimerPhase, TimerState,
+};
