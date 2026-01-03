@@ -4,6 +4,24 @@
 **TDD（テスト駆動開発）を強制**し、品質基準を満たすまでリトライします。
 **container-use環境**でクローズドな開発・テストを行います。
 
+---
+
+## ⛔ 絶対ルール（違反厳禁）
+
+> **container-use環境の使用は必須です。ホスト環境での直接実装は一切禁止。**
+
+| ⛔ 絶対禁止 | ✅ 必ずこうする |
+|------------|----------------|
+| ホスト環境で `edit` / `write` ツールを使用 | `container-use_environment_file_write` を使用 |
+| ホスト環境で `bash git commit/push` を実行 | `container-use_environment_run_cmd` でgit操作 |
+| ホスト環境で `bash cargo test` 等を実行 | `container-use_environment_run_cmd` でテスト |
+| `cu-*` ブランチから直接PRを作成 | featureブランチを作成してからPR |
+| container-use環境を作成せずに実装開始 | 必ず環境作成してから実装 |
+
+**違反した場合**: 即座に作業を中断し、正しいフローでやり直すこと。
+
+---
+
 ## 引数
 Issue番号を指定（例: `/implement-issues 123`）
 
@@ -70,6 +88,9 @@ bash(f"git push -u origin feature/issue-{issue_id}-{short_description}")
 |--------|-------------|
 | `cu-*` ブランチから直接PRを作成 | featureブランチからPRを作成 |
 | ブランチ作成をスキップしてcontainer-use環境を開始 | 先にfeatureブランチを作成してからcontainer-use環境を作成 |
+| ホスト環境で `edit`/`write` ツールを使ってコード編集 | `container-use_environment_file_write` を使用 |
+| ホスト環境で `bash` ツールを使ってテスト実行 | `container-use_environment_run_cmd` を使用 |
+| container-use環境なしで実装を開始 | 必ず環境作成後に実装開始 |
 
 ### 1. container-use環境構築
 
@@ -230,24 +251,28 @@ Closes #{issue_id}
 
 ### 9. PR作成 (container内で実行)
 
+> **⚠️ 重要**: PRのタイトルと本文は**日本語**で記述してください。
+
 ```python
 container-use_environment_run_cmd(
     environment_id=env_id,
     environment_source="/path/to/repo",
     command='''
         gh pr create \
-          --title "feat: {title}" \
-          --body "## Summary
+          --title "feat: {日本語タイトル}" \
+          --body "## 概要
 Closes #{issue_id}
 
-## Changes
-- {change1}
-- {change2}
+{変更の概要を日本語で記述}
 
-## Test Results
+## 変更内容
+- {変更点1}
+- {変更点2}
+
+## テスト結果
 {test_log}
 
-## Checklist
+## チェックリスト
 - [x] TDDで実装
 - [x] 品質レビュー通過
 - [x] Lintエラーなし
@@ -257,6 +282,15 @@ Closes #{issue_id}
     '''
 )
 ```
+
+**PRタイトル形式（日本語）**:
+| プレフィックス | 用途 | 例 |
+|---------------|------|-----|
+| `feat:` | 新機能 | `feat: ポモドーロタイマーの基本データ型を追加` |
+| `fix:` | バグ修正 | `fix: タイマー停止時のエラーを修正` |
+| `refactor:` | リファクタリング | `refactor: 設定管理のコードを整理` |
+| `test:` | テスト追加 | `test: IPC通信のユニットテストを追加` |
+| `docs:` | ドキュメント | `docs: READMEにインストール手順を追加` |
 
 ## 技術スタック別設定
 
@@ -301,15 +335,32 @@ config = {
 
 ## Sisyphusへの指示
 
+### 使用するツール
+
+| フェーズ | 使用ツール | 禁止ツール |
+|---------|-----------|-----------|
+| ブランチ作成 | `bash` (git checkout/push のみ) | - |
+| 環境構築 | `container-use_environment_create` | - |
+| ファイル編集 | `container-use_environment_file_write` | `edit`, `write` |
+| ファイル読み取り | `container-use_environment_file_read` | `read` (参照目的は可) |
+| コマンド実行 | `container-use_environment_run_cmd` | `bash` (テスト/ビルド) |
+| Git操作 | `container-use_environment_run_cmd` | `bash git commit/push` |
+| PR作成 | `container-use_environment_run_cmd` | `bash gh pr create` |
+
+### 実装フロー
+
 ```python
 def implement_issue(issue_id):
-    # 0. ブランチ作成 (ホスト側)
-    branch_name = create_feature_branch(issue_id)
+    # 0. ブランチ作成 (ホスト側 - bashツール使用OK)
+    branch_name = create_feature_branch(issue_id)  # bash("git checkout -b ...")
     
     # 1. Container環境構築 (from_git_ref でブランチ指定)
     env = container_use_environment_create(
         from_git_ref=branch_name
     )
+    
+    # ⚠️ ここから先は全てcontainer-use環境内で実行
+    # edit/write/bashツールは使用禁止
     
     # 2. サービス追加
     if needs_database(issue_id):
@@ -318,10 +369,13 @@ def implement_issue(issue_id):
     # 3. Handover Check
     resolve_handovers_if_any(issue_id)
         
-    # 4. TDD Loop (全てcontainer内)
+    # 4. TDD Loop (container-use_environment_* ツールのみ使用)
     while not all_tests_pass:
+        # container-use_environment_run_cmd でテスト
         run_tests_in_container(env)   # Red
+        # container-use_environment_file_write で実装
         implement_in_container(env)    # Green
+        # container-use_environment_run_cmd でlint
         refactor_in_container(env)     # Refactor
     
     # 5. Design Fix Check
@@ -333,9 +387,9 @@ def implement_issue(issue_id):
     if review_score < 9:
         continue_tdd_loop()
         
-    # 7. Commit & Push & PR (container内)
-    commit_and_push_in_container(env)
-    create_pr_in_container(env)
+    # 7. Commit & Push & PR (container-use_environment_run_cmd で実行)
+    commit_and_push_in_container(env)  # git add/commit/push
+    create_pr_in_container(env)        # gh pr create (日本語)
 ```
 
 ## 参考
