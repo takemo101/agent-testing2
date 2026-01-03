@@ -834,7 +834,6 @@ mod tests {
 
         #[tokio::test]
         async fn test_all_commands_flow() {
-            let socket_path = create_temp_socket_path();
             let (engine, _rx) = create_engine();
             let handler = RequestHandler::new(engine);
 
