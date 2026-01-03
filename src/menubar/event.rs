@@ -296,7 +296,7 @@ mod tests {
 
         #[test]
         fn test_default() {
-            let _handler = EventHandler::default();
+            let _handler = EventHandler;
         }
 
         #[test]
