@@ -194,6 +194,28 @@ impl Drop for IpcServer {
 // ============================================================================
 
 /// Handles IPC requests by dispatching to TimerEngine.
+///
+/// # Architecture Note
+///
+/// This handler uses `Arc<Mutex<TimerEngine>>` for synchronization.
+/// In the production Daemon implementation, the timer tick loop and IPC
+/// handling run as separate tasks coordinated via `tokio::select!`:
+///
+/// ```text
+/// loop {
+///     tokio::select! {
+///         _ = ticker.tick() => { /* tick processing */ }
+///         Ok(stream) = ipc_server.accept() => { /* handle IPC request */ }
+///     }
+/// }
+/// ```
+///
+/// This design ensures the mutex is only held briefly during command
+/// execution, not during the entire timer loop. The timer loop controls
+/// the tick timing, while IPC requests modify the shared state atomically.
+///
+/// For high-concurrency scenarios, consider the Actor pattern with
+/// message channels (see daemon-server.md Section 4 for details).
 pub struct RequestHandler {
     /// Shared reference to the timer engine
     engine: Arc<Mutex<TimerEngine>>,
