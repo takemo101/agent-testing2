@@ -236,7 +236,7 @@ impl TimerEngine {
     }
 
     /// Returns a mutable reference to the timer state (for testing).
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn get_state_mut(&mut self) -> &mut TimerState {
         &mut self.state
     }
