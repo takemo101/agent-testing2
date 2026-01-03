@@ -45,7 +45,7 @@ jobs:
     needs: lint
     strategy:
       matrix:
-        rust: [1.71, stable]
+        rust: ["1.74", stable]
     steps:
       - uses: actions/checkout@v4
 
