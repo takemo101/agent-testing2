@@ -51,10 +51,13 @@ flowchart TB
     DESIGN_CHECK -->|あり| REQ_FIX[/"/request-design-fix"/]
     REQ_FIX --> ENV
     
-    DESIGN_CHECK -->|なし| REVIEW{品質レビュー}
+    DESIGN_CHECK -->|なし| LINT_CHECK["🧹 Lint/型チェック/テスト"]
+    LINT_CHECK --> REVIEW{"🔍 品質レビュー<br/>@backend-reviewer等<br/>【必須】スキップ禁止"}
     REVIEW -->|OK (>=9点)| COMMIT["💾 コミット & プッシュ<br/>(container内)"]
-    REVIEW -->|NG| FIX[修正]
-    FIX --> TDD_RED
+    REVIEW -->|NG (7-8点)| FIX[指摘修正]
+    REVIEW -->|NG (<=6点)| DESIGN_REVIEW[設計見直し検討]
+    FIX --> LINT_CHECK
+    DESIGN_REVIEW --> TDD_RED
     
     COMMIT --> PR["🔀 PR作成<br/>(container内)"]
     PR --> FINISH(完了)
@@ -219,9 +222,120 @@ container-use_environment_run_cmd(command="npx flyway migrate")
 
 他領域への影響がある場合は [申し送り処理ガイド](../skill/handover-process.md) に従う。
 
-### 7. 品質レビュー
+### 7. 品質レビュー ⚠️ 必須
 
-スコア9点以上で次へ。未達の場合はTDDサイクルに戻る。
+> **⚠️ 重要**: PR作成前に必ず品質レビューを実行すること。スキップ厳禁。
+
+#### 7.1 レビュー対象の確認
+
+実装完了後、以下を確認してからレビューを依頼：
+
+```python
+# Lint & 型チェック通過を確認
+container-use_environment_run_cmd(
+    environment_id=env_id,
+    environment_source="/path/to/repo",
+    command="cargo clippy -- -D warnings && cargo fmt --check"  # Rust
+    # command="npm run lint && npm run type-check"  # TypeScript
+)
+
+# テスト全通過を確認
+container-use_environment_run_cmd(
+    environment_id=env_id,
+    environment_source="/path/to/repo",
+    command="cargo test"  # Rust
+    # command="npm test"  # TypeScript
+)
+```
+
+#### 7.2 レビューエージェント選択
+
+| 実装内容 | 使用エージェント |
+|----------|------------------|
+| バックエンド/ライブラリ/CLI | `backend-reviewer` |
+| フロントエンドUI | `frontend-reviewer` |
+| データベース関連 | `database-reviewer` |
+| インフラ/CI/CD | `infra-reviewer` |
+| セキュリティ関連 | `security-reviewer` |
+
+複数領域にまたがる場合は、主要な領域のレビューエージェントを使用。
+
+#### 7.3 レビュー実行
+
+**Taskエージェントを使用してレビューを実行**：
+
+```python
+# backend-reviewer の例
+task(
+    subagent_type="backend-reviewer",
+    description="Issue #{issue_id} 実装コードレビュー",
+    prompt=f"""
+## レビュー対象
+- Issue: #{issue_id} - {issue_title}
+- 変更ファイル: {changed_files}
+- 設計書: {design_doc_path}
+
+## レビュー依頼
+以下の観点でコードをレビューし、10点満点でスコアリングしてください：
+
+1. **設計書との整合性** - 詳細設計書の仕様を正しく実装しているか
+2. **コード品質** - SOLID原則、命名規則、可読性
+3. **エラーハンドリング** - 適切なエラー処理、境界条件の考慮
+4. **テスト** - カバレッジ、エッジケースの網羅
+5. **セキュリティ** - 脆弱性、入力検証
+
+## 出力形式
+- **総合スコア**: X/10
+- **問題点**: （あれば具体的に）
+- **改善提案**: （あれば具体的に）
+"""
+)
+```
+
+#### 7.4 スコア判定
+
+| スコア | アクション |
+|--------|----------|
+| **9点以上** | ✅ レビュー通過 → コミット & PR作成へ |
+| **7-8点** | ⚠️ 指摘事項を修正 → 再レビュー |
+| **6点以下** | ❌ 重大な問題あり → 設計見直しを検討 |
+
+#### 7.5 修正 & 再レビュー
+
+スコア未達の場合：
+
+1. レビュー指摘事項をTODOリストに追加
+2. container-use環境内で修正を実施
+3. テスト再実行で問題なしを確認
+4. **再度レビューエージェントを呼び出し**（スキップ禁止）
+
+```python
+# 修正後の再レビュー
+task(
+    subagent_type="backend-reviewer",
+    description="Issue #{issue_id} 修正後再レビュー",
+    prompt=f"""
+## 前回レビュー
+- スコア: {previous_score}/10
+- 指摘事項: {issues}
+
+## 修正内容
+{fix_summary}
+
+## 再レビュー依頼
+修正が適切に行われたか確認し、再スコアリングしてください。
+"""
+)
+```
+
+#### 7.6 レビュー失敗時のエスカレーション
+
+3回連続でスコア9点未満の場合：
+
+1. Draft PRを作成（`--draft`フラグ）
+2. PRの本文に「レビュー未通過」と明記
+3. 未解決の指摘事項をPRコメントに記載
+4. ユーザーに報告して判断を仰ぐ
 
 ### 8. コミット & プッシュ (container内で実行)
 
@@ -344,6 +458,7 @@ config = {
 | ファイル編集 | `container-use_environment_file_write` | `edit`, `write` |
 | ファイル読み取り | `container-use_environment_file_read` | `read` (参照目的は可) |
 | コマンド実行 | `container-use_environment_run_cmd` | `bash` (テスト/ビルド) |
+| **品質レビュー** | **`task` + レビューエージェント** | **スキップ禁止** |
 | Git操作 | `container-use_environment_run_cmd` | `bash git commit/push` |
 | PR作成 | `container-use_environment_run_cmd` | `bash gh pr create` |
 
@@ -382,12 +497,23 @@ def implement_issue(issue_id):
     if design_flaw_detected:
         request_design_fix(issue_id)
         return
+    
+    # 6. Lint & Test 確認
+    run_lint_and_tests_in_container(env)
+    
+    # 7. 品質レビュー【必須】スキップ禁止
+    review_result = task(
+        subagent_type="backend-reviewer",  # または適切なレビューエージェント
+        description=f"Issue #{issue_id} コードレビュー",
+        prompt=review_prompt
+    )
+    
+    if review_result.score < 9:
+        # 指摘事項を修正して再レビュー
+        fix_issues_in_container(env, review_result.issues)
+        continue_to_step_6()  # Lint & Test から再実行
         
-    # 6. Review
-    if review_score < 9:
-        continue_tdd_loop()
-        
-    # 7. Commit & Push & PR (container-use_environment_run_cmd で実行)
+    # 8. Commit & Push & PR (container-use_environment_run_cmd で実行)
     commit_and_push_in_container(env)  # git add/commit/push
     create_pr_in_container(env)        # gh pr create (日本語)
 ```
