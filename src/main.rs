@@ -142,14 +142,7 @@ mod tests {
 
     #[test]
     fn test_cli_parse_start_with_options() {
-        let cli = Cli::parse_from([
-            "pomodoro",
-            "start",
-            "--work",
-            "30",
-            "--task",
-            "Test",
-        ]);
+        let cli = Cli::parse_from(["pomodoro", "start", "--work", "30", "--task", "Test"]);
         match cli.command {
             Some(Commands::Start(args)) => {
                 assert_eq!(args.work, 30);
