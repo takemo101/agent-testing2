@@ -1,6 +1,6 @@
 //! Sound player implementation using rodio.
 //!
-//! This module provides the `RodioSoundPlayer` which uses the rodio v0.21
+//! This module provides the `RodioSoundPlayer` which uses the rodio v0.20
 //! audio library for cross-platform sound playback.
 
 use std::fs::File;
@@ -8,7 +8,7 @@ use std::io::{BufReader, Cursor};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use rodio::{Decoder, OutputStream, Sink};
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use tracing::{debug, error, warn};
 
 use super::embedded::get_embedded_sound;
@@ -22,6 +22,8 @@ use super::source::SoundSource;
 pub struct RodioSoundPlayer {
     /// The audio output stream (must be kept alive for playback).
     _stream: OutputStream,
+    /// Handle to the output stream for creating sinks.
+    stream_handle: OutputStreamHandle,
     /// Whether sound playback is disabled.
     disabled: AtomicBool,
 }
@@ -38,13 +40,14 @@ impl RodioSoundPlayer {
     /// Returns `SoundError::DeviceNotAvailable` if no audio output device
     /// is available.
     pub fn new(disabled: bool) -> Result<Self, SoundError> {
-        let stream = rodio::OutputStreamBuilder::open_default_stream()
+        let (stream, stream_handle) = OutputStream::try_default()
             .map_err(|e| SoundError::DeviceNotAvailable(e.to_string()))?;
 
         debug!("Audio output stream initialized");
 
         Ok(Self {
             _stream: stream,
+            stream_handle,
             disabled: AtomicBool::new(disabled),
         })
     }
@@ -131,7 +134,9 @@ impl RodioSoundPlayer {
     where
         R: std::io::Read + std::io::Seek + Send + Sync + 'static,
     {
-        let sink = Sink::connect_new(&self._stream.mixer());
+        let sink = Sink::try_new(&self.stream_handle)
+            .map_err(|e| SoundError::StreamError(e.to_string()))?;
+
         sink.append(decoder);
         sink.detach(); // Non-blocking: sound continues after function returns
 
