@@ -32,7 +32,8 @@ pub use types::{
 // Re-export notification types on macOS
 #[cfg(target_os = "macos")]
 pub use notification::{
-    NotificationActionEvent, NotificationError, NotificationManager, NotificationType,
+    MockNotificationSender, NotificationActionEvent, NotificationError, NotificationManager,
+    NotificationSender, NotificationType,
 };
 
 // Re-export menubar types
@@ -43,14 +44,15 @@ pub use menubar::{
 
 // Re-export sound types
 pub use sound::{
-    discover_system_sounds, get_default_sound, play_notification_sound, RodioSoundPlayer,
-    SoundError, SoundSource,
+    discover_system_sounds, get_default_sound, play_notification_sound, MockSoundPlayer,
+    RodioSoundPlayer, SoundError, SoundPlayer, SoundSource,
 };
 
 // Re-export focus mode types
 pub use focus::{
     disable_focus, disable_focus_with_timeout, enable_focus, enable_focus_with_timeout,
-    shortcuts_exists, FocusModeConfig, FocusModeError,
+    shortcuts_exists, FocusModeConfig, FocusModeController, FocusModeError,
+    MockFocusModeController, ShortcutsFocusController,
 };
 
 // Re-export launchagent types
