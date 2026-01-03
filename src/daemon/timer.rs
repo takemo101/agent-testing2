@@ -908,8 +908,6 @@ mod tests {
             engine.pause().unwrap();
             let _ = rx.try_recv(); // consume Paused
 
-            let initial_remaining = engine.get_state().remaining_seconds;
-
             // Run the engine in a separate task
             let handle = tokio::spawn(async move {
                 engine.run().await
