@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 use super::embedded::get_embedded_sound;
 use super::error::SoundError;
