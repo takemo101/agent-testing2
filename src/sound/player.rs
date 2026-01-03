@@ -183,9 +183,9 @@ impl std::fmt::Debug for RodioSoundPlayer {
 /// This is a convenience function for optional sound support.
 /// If audio initialization fails, a warning is logged and None is returned.
 #[must_use]
-pub fn try_create_player(disabled: bool) -> Option<Arc<RodioSoundPlayer>> {
+pub fn try_create_player(disabled: bool) -> Option<RodioSoundPlayer> {
     match RodioSoundPlayer::new(disabled) {
-        Ok(player) => Some(Arc::new(player)),
+        Ok(player) => Some(player),
         Err(e) => {
             warn!("Audio not available, sound disabled: {}", e);
             None
