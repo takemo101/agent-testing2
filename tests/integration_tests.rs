@@ -45,7 +45,9 @@ async fn handle_single_request(server: &IpcServer, handler: &RequestHandler) {
     let mut stream = server.accept().await.unwrap();
     let request = IpcServer::receive_request(&mut stream).await.unwrap();
     let response = handler.handle(request).await;
-    IpcServer::send_response(&mut stream, &response).await.unwrap();
+    IpcServer::send_response(&mut stream, &response)
+        .await
+        .unwrap();
 }
 
 /// Runs multiple request-response cycles (for retry handling).
@@ -106,7 +108,11 @@ async fn tc_i_001_timer_start_via_ipc() {
     let response = client.start(&args).await;
 
     // Assert
-    assert!(response.is_ok(), "Expected successful response, got: {:?}", response);
+    assert!(
+        response.is_ok(),
+        "Expected successful response, got: {:?}",
+        response
+    );
     let response = response.unwrap();
     assert_eq!(response.status, "success");
     assert_eq!(response.message, "タイマーを開始しました");
@@ -139,9 +145,9 @@ async fn tc_i_001_timer_start_with_custom_settings() {
 
     let client = IpcClient::with_socket_path(socket_path);
     let args = StartArgs {
-        work: 45,          // Custom work time
-        break_time: 10,    // Custom break time
-        long_break: 30,    // Custom long break
+        work: 45,       // Custom work time
+        break_time: 10, // Custom break time
+        long_break: 30, // Custom long break
         task: Some("カスタム作業".to_string()),
         auto_cycle: true,
         focus_mode: false,
@@ -196,7 +202,11 @@ async fn tc_i_002_timer_pause_via_ipc() {
     let response = client.pause().await;
 
     // Assert
-    assert!(response.is_ok(), "Expected successful response, got: {:?}", response);
+    assert!(
+        response.is_ok(),
+        "Expected successful response, got: {:?}",
+        response
+    );
     let response = response.unwrap();
     assert_eq!(response.status, "success");
     assert_eq!(response.message, "タイマーを一時停止しました");
@@ -345,7 +355,10 @@ async fn tc_i_004_connection_error_when_daemon_not_running() {
     let result = client.status().await;
 
     // Should fail with connection error
-    assert!(result.is_err(), "Expected connection error when daemon not running");
+    assert!(
+        result.is_err(),
+        "Expected connection error when daemon not running"
+    );
 
     let error_msg = result.unwrap_err().to_string();
     // The error should indicate connection failure
@@ -383,9 +396,9 @@ async fn tc_i_004_connection_timeout() {
             // Expected: connection error or timeout
             let error_msg = e.to_string();
             assert!(
-                error_msg.contains("タイムアウト") ||
-                error_msg.contains("timeout") ||
-                error_msg.contains("応答がありませんでした"),
+                error_msg.contains("タイムアウト")
+                    || error_msg.contains("timeout")
+                    || error_msg.contains("応答がありませんでした"),
                 "Expected timeout error, got: {}",
                 error_msg
             );
@@ -420,7 +433,9 @@ async fn test_full_workflow_integration() {
             let mut stream = server_clone.accept().await.unwrap();
             let request = IpcServer::receive_request(&mut stream).await.unwrap();
             let response = handler_clone.handle(request).await;
-            IpcServer::send_response(&mut stream, &response).await.unwrap();
+            IpcServer::send_response(&mut stream, &response)
+                .await
+                .unwrap();
         }
     });
 
@@ -431,27 +446,42 @@ async fn test_full_workflow_integration() {
     // Step 1: Start
     let response = client.start(&StartArgs::default()).await.unwrap();
     assert_eq!(response.status, "success");
-    assert_eq!(response.data.as_ref().unwrap().state, Some("working".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("working".to_string())
+    );
 
     // Step 2: Pause
     let response = client.pause().await.unwrap();
     assert_eq!(response.status, "success");
-    assert_eq!(response.data.as_ref().unwrap().state, Some("paused".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("paused".to_string())
+    );
 
     // Step 3: Resume
     let response = client.resume().await.unwrap();
     assert_eq!(response.status, "success");
-    assert_eq!(response.data.as_ref().unwrap().state, Some("working".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("working".to_string())
+    );
 
     // Step 4: Stop
     let response = client.stop().await.unwrap();
     assert_eq!(response.status, "success");
-    assert_eq!(response.data.as_ref().unwrap().state, Some("stopped".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("stopped".to_string())
+    );
 
     // Step 5: Status
     let response = client.status().await.unwrap();
     assert_eq!(response.status, "success");
-    assert_eq!(response.data.as_ref().unwrap().state, Some("stopped".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("stopped".to_string())
+    );
 
     let _ = server_handle.await;
 }
@@ -511,7 +541,9 @@ async fn test_concurrent_clients_sequential() {
             let mut stream = server_clone.accept().await.unwrap();
             let request = IpcServer::receive_request(&mut stream).await.unwrap();
             let response = handler_clone.handle(request).await;
-            IpcServer::send_response(&mut stream, &response).await.unwrap();
+            IpcServer::send_response(&mut stream, &response)
+                .await
+                .unwrap();
         }
     });
 
