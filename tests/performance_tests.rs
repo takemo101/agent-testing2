@@ -20,7 +20,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use pomodoro::cli::client::IpcClient;
 use pomodoro::daemon::ipc::{IpcServer, RequestHandler};
-use pomodoro::daemon::timer::TimerEngine;
+use pomodoro::daemon::timer::{TimerEngine, TimerEvent};
 use pomodoro::sound::{MockSoundPlayer, SoundPlayer, SoundSource};
 use pomodoro::types::{IpcRequest, PomodoroConfig, StartParams};
 
