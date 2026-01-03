@@ -8,10 +8,12 @@
 //! - Type definitions for configuration and state
 //! - Native macOS notification system (macOS only)
 //! - Menu bar UI with tray icon (macOS only)
+//! - Sound playback for timer notifications
 
 pub mod cli;
 pub mod daemon;
 pub mod menubar;
+pub mod sound;
 pub mod types;
 
 // macOS-specific notification system
