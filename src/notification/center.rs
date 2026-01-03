@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::ptr::NonNull;
 
-use block2::RcBlock;
+use block2::StackBlock;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_foundation::{NSError, NSSet};
@@ -43,7 +43,7 @@ impl NotificationCenter {
             | UNAuthorizationOptions::Badge;
 
         let cb = RefCell::new(Some(tx));
-        let block = RcBlock::new(move |granted: bool, error: *mut NSError| {
+        let block = StackBlock::new(move |granted: bool, error: *mut NSError| {
             if let Some(sender) = cb.borrow_mut().take() {
                 let result = if !error.is_null() {
                     let err_ref = unsafe { error.as_ref() }.unwrap();
@@ -59,7 +59,8 @@ impl NotificationCenter {
         });
 
         unsafe {
-            Self::current().requestAuthorizationWithOptions_completionHandler(options, &block);
+            Self::current()
+                .requestAuthorizationWithOptions_completionHandler(options, &block.copy());
         }
 
         rx.await
@@ -71,7 +72,7 @@ impl NotificationCenter {
         let (tx, rx) = oneshot::channel::<UNAuthorizationStatus>();
 
         let cb = RefCell::new(Some(tx));
-        let block = RcBlock::new(move |settings: NonNull<UNNotificationSettings>| {
+        let block = StackBlock::new(move |settings: NonNull<UNNotificationSettings>| {
             if let Some(sender) = cb.borrow_mut().take() {
                 let status = unsafe { settings.as_ref().authorizationStatus() };
                 let _ = sender.send(status);
@@ -79,7 +80,7 @@ impl NotificationCenter {
         });
 
         unsafe {
-            Self::current().getNotificationSettingsWithCompletionHandler(&block);
+            Self::current().getNotificationSettingsWithCompletionHandler(&block.copy());
         }
 
         rx.await
@@ -134,7 +135,7 @@ impl NotificationCenter {
         let (tx, rx) = oneshot::channel::<Result<(), NotificationError>>();
 
         let cb = RefCell::new(Some(tx));
-        let block = RcBlock::new(move |error: *mut NSError| {
+        let block = StackBlock::new(move |error: *mut NSError| {
             if let Some(sender) = cb.borrow_mut().take() {
                 let result = if !error.is_null() {
                     let err_ref = unsafe { error.as_ref() }.unwrap();
@@ -148,7 +149,8 @@ impl NotificationCenter {
         });
 
         unsafe {
-            Self::current().addNotificationRequest_withCompletionHandler(request, Some(&block));
+            Self::current()
+                .addNotificationRequest_withCompletionHandler(request, Some(&block.copy()));
         }
 
         rx.await
