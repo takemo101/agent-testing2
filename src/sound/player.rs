@@ -6,7 +6,6 @@
 use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use tracing::{debug, warn};
