@@ -240,7 +240,7 @@ mod tests {
 
         #[test]
         fn test_default() {
-            let _builder = MenuBuilder::default();
+            let _builder = MenuBuilder;
         }
     }
 
