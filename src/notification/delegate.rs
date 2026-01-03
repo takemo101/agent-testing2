@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 use block2::Block;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
+use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_foundation::{NSObject, NSObjectProtocol};
 use objc2_user_notifications::{
     UNNotification, UNNotificationPresentationOptions, UNNotificationResponse,

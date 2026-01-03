@@ -6,9 +6,9 @@
 use std::cell::RefCell;
 use std::ptr::NonNull;
 
-use block2::StackBlock;
+use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::ProtocolObject;
+use objc2::runtime::{Bool, ProtocolObject};
 use objc2_foundation::{NSError, NSSet};
 use objc2_user_notifications::{
     UNAuthorizationOptions, UNAuthorizationStatus, UNNotificationCategory, UNNotificationRequest,
@@ -43,7 +43,7 @@ impl NotificationCenter {
             | UNAuthorizationOptions::Badge;
 
         let cb = RefCell::new(Some(tx));
-        let block = StackBlock::new(move |granted: bool, error: *mut NSError| {
+        let block = RcBlock::new(move |granted: Bool, error: *mut NSError| {
             if let Some(sender) = cb.borrow_mut().take() {
                 let result = if !error.is_null() {
                     let err_ref = unsafe { error.as_ref() }.unwrap();
@@ -52,15 +52,14 @@ impl NotificationCenter {
                         description.to_string(),
                     ))
                 } else {
-                    Ok(granted)
+                    Ok(granted.as_bool())
                 };
                 let _ = sender.send(result);
             }
         });
 
         unsafe {
-            Self::current()
-                .requestAuthorizationWithOptions_completionHandler(options, &block.copy());
+            Self::current().requestAuthorizationWithOptions_completionHandler(options, &block);
         }
 
         rx.await
@@ -72,7 +71,7 @@ impl NotificationCenter {
         let (tx, rx) = oneshot::channel::<UNAuthorizationStatus>();
 
         let cb = RefCell::new(Some(tx));
-        let block = StackBlock::new(move |settings: NonNull<UNNotificationSettings>| {
+        let block = RcBlock::new(move |settings: NonNull<UNNotificationSettings>| {
             if let Some(sender) = cb.borrow_mut().take() {
                 let status = unsafe { settings.as_ref().authorizationStatus() };
                 let _ = sender.send(status);
@@ -80,7 +79,7 @@ impl NotificationCenter {
         });
 
         unsafe {
-            Self::current().getNotificationSettingsWithCompletionHandler(&block.copy());
+            Self::current().getNotificationSettingsWithCompletionHandler(&block);
         }
 
         rx.await
@@ -104,8 +103,7 @@ impl NotificationCenter {
     /// * `categories` - The categories to register
     pub fn set_notification_categories(categories: &[Retained<UNNotificationCategory>]) {
         let refs: Vec<&UNNotificationCategory> = categories.iter().map(|c| c.as_ref()).collect();
-        let categories_set: Retained<NSSet<UNNotificationCategory>> =
-            unsafe { NSSet::from_slice(&refs) };
+        let categories_set: Retained<NSSet<UNNotificationCategory>> = NSSet::from_slice(&refs);
 
         unsafe {
             Self::current().setNotificationCategories(&categories_set);
@@ -135,7 +133,7 @@ impl NotificationCenter {
         let (tx, rx) = oneshot::channel::<Result<(), NotificationError>>();
 
         let cb = RefCell::new(Some(tx));
-        let block = StackBlock::new(move |error: *mut NSError| {
+        let block = RcBlock::new(move |error: *mut NSError| {
             if let Some(sender) = cb.borrow_mut().take() {
                 let result = if !error.is_null() {
                     let err_ref = unsafe { error.as_ref() }.unwrap();
@@ -149,8 +147,7 @@ impl NotificationCenter {
         });
 
         unsafe {
-            Self::current()
-                .addNotificationRequest_withCompletionHandler(request, Some(&block.copy()));
+            Self::current().addNotificationRequest_withCompletionHandler(request, Some(&block));
         }
 
         rx.await
