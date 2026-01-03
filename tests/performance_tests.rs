@@ -91,16 +91,12 @@ impl PerfResult {
 fn tc_p_001_cli_argument_parsing_time() {
     let start = Instant::now();
 
-    // Simulate CLI argument parsing
+    // Simulate CLI argument parsing using the actual CLI struct
     use clap::Parser;
+    use pomodoro::cli::commands::Cli;
 
-    #[derive(Parser)]
-    struct TestCli {
-        #[arg(short, long)]
-        help: bool,
-    }
-
-    let _ = TestCli::try_parse_from(["pomodoro", "--help"]);
+    // Try parsing with --version (simpler than --help which exits)
+    let _ = Cli::try_parse_from(["pomodoro", "status"]);
 
     let duration = start.elapsed();
     let result = PerfResult::new("CLI argument parsing", duration, 100);
