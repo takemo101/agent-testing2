@@ -2,7 +2,7 @@
 name = "pomodoro"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.85"
 authors = ["Pomodoro Timer Team"]
 description = "A macOS-native Pomodoro timer CLI tool"
 license = "MIT"
@@ -46,6 +46,11 @@ objc2-user-notifications = "0.3"
 
 # Menu bar UI (tray icon) - macOS native
 tray-icon = "0.21"
+
+# Audio playback for sound notifications
+[dependencies.rodio]
+version = "0.20"
+default-features = true
 
 [dev-dependencies]
 assert_cmd = "2.0"

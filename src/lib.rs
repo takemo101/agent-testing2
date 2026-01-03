@@ -8,10 +8,12 @@
 //! - Type definitions for configuration and state
 //! - Native macOS notification system (macOS only)
 //! - Menu bar UI with tray icon (macOS only)
+//! - Sound playback for timer notifications
 
 pub mod cli;
 pub mod daemon;
 pub mod menubar;
+pub mod sound;
 pub mod types;
 
 // macOS-specific notification system
@@ -33,4 +35,10 @@ pub use notification::{
 pub use menubar::{
     EventHandler, IconManager, MenuAction, MenuBuilder, MenuConfig, MenuItemConfig, MenuItemId,
     TrayIconManager, TrayUpdate,
+};
+
+// Re-export sound types
+pub use sound::{
+    discover_system_sounds, get_default_sound, play_notification_sound, RodioSoundPlayer,
+    SoundError, SoundSource,
 };
