@@ -403,3 +403,142 @@ config = {
 3. **環境変数の活用**: 接続情報は環境変数で管理
 4. **チェックポイント**: 安定した状態でスナップショットを保存
 5. **クリーンアップ**: 不要になった環境は削除
+
+## 環境ID管理 (environments.json)
+
+PRレビュー後の修正作業で環境を再利用するため、環境IDを `.opencode/environments.json` で追跡します。
+
+**ファイル形式**:
+
+```json
+{
+  "$schema": "./environments.schema.json",
+  "environments": [
+    {
+      "env_id": "abc-123-def",
+      "branch": "feature/issue-42-user-auth",
+      "issue_number": 42,
+      "pr_number": 45,
+      "status": "active",
+      "created_at": "2026-01-03T10:00:00Z",
+      "last_used_at": "2026-01-03T15:30:00Z"
+    }
+  ]
+}
+```
+
+### ステータス更新タイミング
+
+| イベント | ステータス変更 | アクション |
+|---------|---------------|-----------|
+| 環境作成時 | → `active` | 新規エントリ追加 |
+| PR作成時 | `active` のまま | `pr_number` を記録 |
+| PRマージ時 | → `merged` | 環境は保持（後で削除可） |
+| PRクローズ時（マージなし） | → `abandoned` | 環境削除を推奨 |
+| 環境手動削除時 | エントリ削除 | environments.jsonから削除 |
+
+> **有効なステータス値**: `active`, `merged`, `abandoned`（スキーマ定義に準拠）
+
+### environments.json 更新手順
+
+**誰が更新するか**: Sisyphus（AIエージェント）が `container-use_environment_*` ツール使用時に自動更新する。
+
+**更新方法**:
+
+```python
+# 環境作成時の追加
+def add_environment_entry(env_id, branch, issue_number, title):
+    with open('.opencode/environments.json', 'r+') as f:
+        data = json.load(f)
+        data['environments'].append({
+            "env_id": env_id,
+            "branch": branch,
+            "issue_number": issue_number,
+            "title": title,
+            "status": "active",
+            "created_at": datetime.now().isoformat() + "Z",
+            "last_used_at": datetime.now().isoformat() + "Z"
+        })
+        f.seek(0)
+        json.dump(data, f, indent=2)
+        f.truncate()
+
+# ステータス更新
+def update_environment_status(env_id, new_status):
+    with open('.opencode/environments.json', 'r+') as f:
+        data = json.load(f)
+        for env in data['environments']:
+            if env['env_id'] == env_id:
+                env['status'] = new_status
+                env['last_used_at'] = datetime.now().isoformat() + "Z"
+                break
+        f.seek(0)
+        json.dump(data, f, indent=2)
+        f.truncate()
+
+# PR番号の記録（PR作成時）
+def set_pr_number(env_id, pr_number):
+    with open('.opencode/environments.json', 'r+') as f:
+        data = json.load(f)
+        for env in data['environments']:
+            if env['env_id'] == env_id:
+                env['pr_number'] = pr_number
+                env['last_used_at'] = datetime.now().isoformat() + "Z"
+                break
+        f.seek(0)
+        json.dump(data, f, indent=2)
+        f.truncate()
+```
+
+**実装時の呼び出しタイミング**:
+- `container-use_environment_create` 成功後 → `add_environment_entry()`
+- `container-use_environment_open` 成功後 → `last_used_at` を更新
+- `gh pr create` 成功後 → `set_pr_number(env_id, pr_number)`
+- PR マージ検知時 → `update_environment_status(env_id, "merged")`
+- PR クローズ検知時 → `update_environment_status(env_id, "abandoned")`
+
+### 環境再利用フロー（PRレビュー修正時）
+
+1. **environments.json を確認**: 該当PR番号でフィルタ
+2. **env_id を取得**: `status: active` のエントリを使用
+3. **環境を開く**: `container-use_environment_open` を使用
+4. **修正作業を実行**: 既存環境内で作業
+5. **last_used_at を更新**: 作業完了時（自動）
+
+```python
+# 環境再利用の例
+import json
+
+# 1. environments.json を読み込み
+with open('.opencode/environments.json') as f:
+    data = json.load(f)
+
+# 2. 該当PRの環境を検索
+env = next(
+    (e for e in data['environments'] 
+     if e['pr_number'] == 45 and e['status'] == 'active'),
+    None
+)
+
+if env:
+    # 3. 既存環境を開く
+    container-use_environment_open(
+        environment_source="/path/to/repo",
+        environment_id=env['env_id'],
+        explanation="Reopen environment for PR feedback fixes"
+    )
+else:
+    # 環境が見つからない場合は新規作成
+    ...
+```
+
+### クリーンアップポリシー
+
+| 条件 | 推奨アクション |
+|------|---------------|
+| PRマージから7日以上経過 | 環境削除 + エントリ削除 |
+| PRクローズ（マージなし） | 即時削除推奨 |
+| `last_used_at` が30日以上前 | 削除検討 |
+
+**注意**: `environments.json` はローカル環境データのため `.gitignore` に含まれています。
+チーム間で共有する必要がある場合は別途管理してください。
