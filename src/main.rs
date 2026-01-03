@@ -7,6 +7,7 @@
 
 use clap::Parser;
 
+pub mod daemon;
 pub mod types;
 
 /// Pomodoro Timer CLI - Stay focused, stay productive
