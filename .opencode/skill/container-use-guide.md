@@ -390,7 +390,7 @@ config = {
 
 ```python
 config = {
-    "base_image": "rust:1.74-slim",
+    "base_image": "rust:1.85-slim",
     "setup_commands": [
         "cargo fetch",
         "cargo build --release"

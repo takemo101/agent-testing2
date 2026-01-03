@@ -6,6 +6,160 @@
 
 ---
 
+## 🚀 複数Issue並列処理（重要）
+
+複数のIssue番号が指定された場合（例: `/implement-issues 9 10`）、**必ず並列処理**を行います。
+
+### 並列処理フロー
+
+```mermaid
+flowchart TB
+    START["複数Issue指定<br/>/implement-issues 9 10"]
+    PARSE["Issue番号パース<br/>[9, 10]"]
+    
+    subgraph PARALLEL["⚡ 並列実行 (container-worker エージェント)"]
+        direction LR
+        subgraph ENV_A["container-worker A"]
+            A1["🌿 ブランチ作成"]
+            A2["🐳 環境構築"]
+            A3["📝 TDD実装"]
+            A4["🔍 レビュー"]
+            A5["🔀 PR作成"]
+            A1 --> A2 --> A3 --> A4 --> A5
+        end
+        
+        subgraph ENV_B["container-worker B"]
+            B1["🌿 ブランチ作成"]
+            B2["🐳 環境構築"]
+            B3["📝 TDD実装"]
+            B4["🔍 レビュー"]
+            B5["🔀 PR作成"]
+            B1 --> B2 --> B3 --> B4 --> B5
+        end
+    end
+    
+    COLLECT["結果収集"]
+    REPORT["完了報告<br/>- PR #25: Issue #9<br/>- PR #26: Issue #10"]
+    
+    START --> PARSE
+    PARSE --> PARALLEL
+    PARALLEL --> COLLECT
+    COLLECT --> REPORT
+```
+
+### 実装パターン
+
+```python
+def implement_issues(issue_ids: list[int]):
+    """
+    複数Issueを並列で実装する
+    
+    引数:
+        issue_ids: Issue番号のリスト（例: [9, 10]）
+    """
+    
+    # 1. 各Issueに対してcontainer-workerをバックグラウンドで並列起動
+    #    ⚠️ background_task を使用することでMCPツール（container-use）が継承される
+    task_ids = []
+    for issue_id in issue_ids:
+        task_id = background_task(
+            agent="container-worker",
+            description=f"Issue #{issue_id} 実装",
+            prompt=generate_implementation_prompt(issue_id)
+        )
+        task_ids.append((issue_id, task_id))
+    
+    # 2. 全タスクの完了を待機・結果収集
+    results = []
+    for issue_id, task_id in task_ids:
+        result = background_output(task_id=task_id)
+        results.append((issue_id, result))
+    
+    # 3. 結果を集約して報告
+    for issue_id, result in results:
+        report_completion(issue_id, result)
+```
+
+### container-worker プロンプト生成
+
+```python
+def generate_implementation_prompt(issue_id: int) -> str:
+    """container-workerに渡すプロンプトを生成"""
+    
+    issue = fetch_github_issue(issue_id)
+    design_doc = find_design_document(issue_id)
+    
+    return f"""
+## タスク
+Issue #{issue_id} を実装し、PRを作成してください。
+
+## Issue情報
+タイトル: {issue.title}
+本文: {issue.body}
+ラベル: {issue.labels}
+
+## 設計書
+{design_doc}
+
+## 実装手順
+1. ブランチ作成: `feature/issue-{issue_id}-{{short_description}}`
+2. container-use環境構築（from_git_ref でブランチ指定）
+3. TDD実装（Red → Green → Refactor）
+4. Lint/型チェック/テスト実行
+5. 品質レビュー（backend-reviewer等）
+6. コミット & プッシュ
+7. PR作成（日本語）
+
+## 期待する出力
+- PR URL
+- 実装サマリー
+- テスト結果
+"""
+```
+
+### 並列処理ルール
+
+| ルール | 説明 |
+|--------|------|
+| **1 Issue = 1 container-worker** | 各Issueは独立したエージェントで処理 |
+| **1 Issue = 1 container-use環境** | 各Issueは独立した環境で実装 |
+| **依存関係チェック** | 依存Issueがある場合は順次処理 |
+| **結果収集** | 全エージェント完了後にサマリー報告 |
+
+### ⚠️ 重要: `background_task` vs `task` の違い
+
+> **必ず `background_task` を使用すること。`task` ではMCPツールが継承されない。**
+
+| ツール | MCPツール継承 | container-use利用 |
+|--------|--------------|-------------------|
+| `background_task` | ✅ 継承される | ✅ 利用可能 |
+| `task` | ❌ 継承されない | ❌ 利用不可（ホスト環境にフォールバック） |
+
+**なぜこれが重要か**:
+- `task` を使用すると、container-workerエージェントは `container-use_*` MCPツールにアクセスできない
+- 結果として、エージェントはホスト環境の `edit`/`write`/`bash` ツールにフォールバックし、container-use環境が使用されない
+- `background_task` はMCP接続を正しくサブエージェントに継承するため、container-use環境での実装が可能
+
+### 依存関係がある場合
+
+```python
+def implement_issues_with_deps(issue_ids: list[int]):
+    """依存関係を考慮した実装"""
+    
+    # 依存グラフを構築
+    dep_graph = build_dependency_graph(issue_ids)
+    
+    # 依存関係がないIssueをグループ化
+    independent_groups = topological_sort(dep_graph)
+    
+    for group in independent_groups:
+        # グループ内は並列実行
+        parallel_implement(group)
+        # 次グループは前グループ完了後
+```
+
+---
+
 ## ⛔ 絶対ルール（違反厳禁）
 
 > **container-use環境の使用は必須です。ホスト環境での直接実装は一切禁止。**
@@ -87,14 +241,55 @@ Issue #43 → container環境 B (env_id: def-456)
 ---
 
 ## 引数
-Issue番号を指定（例: `/implement-issues 123`）
+
+Issue番号を指定します。複数指定可能。
+
+| 形式 | 例 | 処理方法 |
+|------|-----|---------|
+| 単一Issue | `/implement-issues 123` | 順次処理 |
+| 複数Issue（スペース区切り） | `/implement-issues 9 10` | **並列処理** |
+| 複数Issue（カンマ区切り） | `/implement-issues 9,10,11` | **並列処理** |
+| 範囲指定 | `/implement-issues 9-12` | **並列処理** (9,10,11,12) |
+
+### 引数パース処理
+
+```python
+def parse_issue_args(args: str) -> list[int]:
+    """
+    引数をIssue番号のリストに変換
+    
+    例:
+        "123"       → [123]
+        "9 10"      → [9, 10]
+        "9,10,11"   → [9, 10, 11]
+        "9-12"      → [9, 10, 11, 12]
+    """
+    issue_ids = []
+    
+    # スペースまたはカンマで分割
+    parts = re.split(r'[\s,]+', args.strip())
+    
+    for part in parts:
+        if '-' in part and not part.startswith('-'):
+            # 範囲指定: "9-12" → [9, 10, 11, 12]
+            start, end = map(int, part.split('-'))
+            issue_ids.extend(range(start, end + 1))
+        else:
+            issue_ids.append(int(part))
+    
+    return issue_ids
+```
 
 ## ワークフロー概要
 
 ```mermaid
 flowchart TB
     START(Issue着手) --> BRANCH["🌿 ブランチ作成<br/>feature/issue-{N}"]
-    BRANCH --> ENV["🐳 container-use環境構築<br/>(from_git_ref: featureブランチ)"]
+    BRANCH --> DESIGN_CHECK{"📋 設計書確認<br/>詳細設計書存在?"}
+    DESIGN_CHECK -->|存在| ENV["🐳 container-use環境構築<br/>(from_git_ref: featureブランチ)"]
+    DESIGN_CHECK -->|不在| DESIGN_WARN["⚠️ 警告: 設計書なし<br/>ユーザー確認"]
+    DESIGN_WARN -->|続行| ENV
+    DESIGN_WARN -->|中断| ABORT(("中断"))
     ENV --> SERVICE{サービス必要?}
     SERVICE -->|DB等| ADD_SVC[サービス追加]
     SERVICE -->|なし| CHECK_HO
@@ -117,12 +312,14 @@ flowchart TB
     
     DESIGN_CHECK -->|なし| LINT_CHECK["🧹 Lint/型チェック/テスト"]
     LINT_CHECK --> REVIEW{"🔍 品質レビュー<br/>@backend-reviewer等<br/>【必須】スキップ禁止"}
-    REVIEW -->|OK (>=9点)| COMMIT["💾 コミット & プッシュ<br/>(container内)"]
+    REVIEW -->|OK (>=9点)| USER_APPROVE{"👤 ユーザー承認<br/>PR作成許可?"}
     REVIEW -->|NG (7-8点)| FIX[指摘修正]
     REVIEW -->|NG (<=6点)| DESIGN_REVIEW[設計見直し検討]
     FIX --> LINT_CHECK
     DESIGN_REVIEW --> TDD_RED
     
+    USER_APPROVE -->|承認| COMMIT["💾 コミット & プッシュ<br/>(container内)"]
+    USER_APPROVE -->|修正要求| FIX
     COMMIT --> PR["🔀 PR作成<br/>(container内)"]
     PR --> FINISH(完了)
 ```
@@ -158,6 +355,70 @@ bash(f"git push -u origin feature/issue-{issue_id}-{short_description}")
 | ホスト環境で `edit`/`write` ツールを使ってコード編集 | `container-use_environment_file_write` を使用 |
 | ホスト環境で `bash` ツールを使ってテスト実行 | `container-use_environment_run_cmd` を使用 |
 | container-use環境なしで実装を開始 | 必ず環境作成後に実装開始 |
+
+### 0.5. 設計書存在チェック ⚠️ 必須
+
+> **⚠️ 重要**: 実装開始前に、対象Issueに対応する詳細設計書が存在することを確認してください。
+
+```python
+def check_design_document(issue_id: int) -> DesignDocResult:
+    """
+    Issueに対応する設計書の存在を確認
+    
+    Returns:
+        DesignDocResult: 設計書の存在状態と参照パス
+    """
+    
+    # 1. Issueからラベル・タイトルを取得
+    issue = fetch_github_issue(issue_id)
+    
+    # 2. 詳細設計書ディレクトリを検索
+    design_dirs = glob("docs/designs/detailed/**/")
+    
+    # 3. 関連する設計書を特定
+    related_docs = find_related_design_docs(issue, design_dirs)
+    
+    if not related_docs:
+        return DesignDocResult(
+            exists=False,
+            warning="⚠️ 詳細設計書が見つかりません",
+            recommendation="設計書作成を先に行うか、ユーザーに確認してください"
+        )
+    
+    return DesignDocResult(
+        exists=True,
+        paths=related_docs,
+        message=f"✅ 設計書確認: {len(related_docs)}件"
+    )
+```
+
+#### 設計書が存在しない場合
+
+| 状況 | アクション |
+|------|----------|
+| 設計書なし + 小規模変更 | ユーザーに確認 → 承認されれば続行 |
+| 設計書なし + 大規模変更 | 実装中断 → 詳細設計ワークフロー実行を推奨 |
+| 設計書あり | 通常フローで続行 |
+
+```python
+# 設計書確認の実装例
+design_result = check_design_document(issue_id)
+
+if not design_result.exists:
+    # ユーザーに確認
+    user_response = ask_user(f"""
+⚠️ Issue #{issue_id} に対応する詳細設計書が見つかりません。
+
+**推奨アクション**:
+- 大規模な機能追加の場合: `/detailed-design-workflow` を先に実行
+- 小規模な修正の場合: このまま続行可能
+
+このまま実装を続行しますか？ (y/n)
+""")
+    
+    if user_response.lower() != 'y':
+        abort_with_message("設計書作成後に再実行してください")
+```
 
 ### 1. container-use環境構築
 
@@ -401,6 +662,90 @@ task(
 3. 未解決の指摘事項をPRコメントに記載
 4. ユーザーに報告して判断を仰ぐ
 
+### 7.5. ユーザー承認ゲート ⚠️ 必須
+
+> **⚠️ 重要**: PR作成前に必ずユーザーの承認を得ること。自動でPRを作成しない。
+
+品質レビュー通過後（9点以上）、PR作成前にユーザーに確認を求めます。
+
+#### 承認リクエストフォーマット
+
+```markdown
+## ✅ 品質レビュー通過 - PR作成承認リクエスト
+
+### Issue情報
+- **Issue**: #{issue_id} - {issue_title}
+- **ブランチ**: `feature/issue-{issue_id}-{description}`
+
+### レビュー結果
+- **スコア**: {score}/10
+- **レビュアー**: {reviewer_agent}
+
+### 変更概要
+- 新規ファイル: {new_files_count}件
+- 変更ファイル: {modified_files_count}件
+- 削除ファイル: {deleted_files_count}件
+
+### 主な変更内容
+{change_summary}
+
+### テスト結果
+- 合計: {total_tests}件
+- 成功: {passed_tests}件
+- 失敗: {failed_tests}件
+
+---
+
+**PR作成を承認しますか？**
+- `y` または `yes`: PR作成を続行
+- `n` または `no`: 追加修正が必要
+- `draft`: Draft PRとして作成
+```
+
+#### 承認フロー
+
+```python
+def request_user_approval(issue_id: int, review_result: ReviewResult) -> ApprovalResult:
+    """
+    ユーザーにPR作成の承認を求める
+    
+    Returns:
+        ApprovalResult: 承認/却下/ドラフトの判定結果
+    """
+    
+    # 1. 変更サマリーを生成
+    changes = get_change_summary(issue_id)
+    
+    # 2. 承認リクエストを表示
+    display_approval_request(
+        issue_id=issue_id,
+        review_score=review_result.score,
+        changes=changes
+    )
+    
+    # 3. ユーザー入力を待機
+    response = wait_for_user_input()
+    
+    # 4. レスポンスを解釈
+    if response.lower() in ['y', 'yes']:
+        return ApprovalResult(approved=True, as_draft=False)
+    elif response.lower() == 'draft':
+        return ApprovalResult(approved=True, as_draft=True)
+    else:
+        # 追加修正が必要
+        feedback = ask_for_feedback("どのような修正が必要ですか？")
+        return ApprovalResult(approved=False, feedback=feedback)
+```
+
+#### 承認結果に応じたアクション
+
+| ユーザー回答 | アクション |
+|------------|----------|
+| `y` / `yes` | 通常PRを作成 → Phase 8へ |
+| `draft` | Draft PRを作成（`--draft`フラグ付き） |
+| `n` / `no` + フィードバック | 指摘箇所を修正 → Phase 6（Lint & Test）へ戻る |
+| タイムアウト（5分） | 作業を一時停止、ユーザーに再確認を促す |
+
 ### 8. コミット & プッシュ (container内で実行)
 
 ```python
@@ -504,6 +849,8 @@ config = {
 
 ## エラーハンドリング
 
+### 単一Issue処理時
+
 | 状況 | 対応 |
 |------|------|
 | 3回連続レビュー失敗 | Draft PRを作成して終了 |
@@ -511,12 +858,41 @@ config = {
 | 環境構築失敗 | `container-use_environment_config` で設定見直し |
 | サービス接続失敗 | ポート・環境変数を確認 |
 
+### 並列処理時
+
+| 状況 | 対応 |
+|------|------|
+| 1つのIssueが失敗 | 他のIssueは継続、失敗分のみ報告 |
+| 全Issueが失敗 | 各失敗理由を収集して報告 |
+| container-worker タイムアウト | タイムアウトしたIssueをリストアップ |
+| 依存関係エラー | 依存元Issueを先に処理するよう順序変更 |
+
+### 並列処理の結果報告フォーマット
+
+```markdown
+## 実装結果サマリー
+
+| Issue | ステータス | PR | レビュースコア |
+|-------|----------|-----|--------------|
+| #9 | ✅ 成功 | PR #25 | 10/10 |
+| #10 | ✅ 成功 | PR #26 | 9/10 |
+| #11 | ❌ 失敗 | - | - |
+
+### 失敗詳細
+
+#### Issue #11
+- 失敗理由: レビュースコア未達（7/10）
+- 指摘事項: ...
+- 推奨アクション: 指摘事項を修正して再実行
+```
+
 ## Sisyphusへの指示
 
 ### 使用するツール
 
 | フェーズ | 使用ツール | 禁止ツール |
 |---------|-----------|-----------|
+| **複数Issue並列処理** | **`background_task` + `container-worker`** | `task`（MCPツール継承されない）、順次処理 |
 | ブランチ作成 | `bash` (git checkout/push のみ) | - |
 | 環境構築 | `container-use_environment_create` | - |
 | ファイル編集 | `container-use_environment_file_write` | `edit`, `write` |
@@ -526,10 +902,97 @@ config = {
 | Git操作 | `container-use_environment_run_cmd` | `bash git commit/push` |
 | PR作成 | `container-use_environment_run_cmd` | `bash gh pr create` |
 
-### 実装フロー
+### 実装フロー（複数Issue対応）
 
 ```python
-def implement_issue(issue_id):
+def implement_issues(args: str):
+    """
+    メインエントリーポイント
+    複数Issueが指定された場合は並列処理
+    """
+    
+    # 1. 引数パース
+    issue_ids = parse_issue_args(args)  # "9 10" → [9, 10]
+    
+    # 2. 単一 vs 複数で処理分岐
+    if len(issue_ids) == 1:
+        # 単一Issue: 直接処理
+        implement_single_issue(issue_ids[0])
+    else:
+        # 複数Issue: 並列処理
+        implement_issues_parallel(issue_ids)
+
+
+def implement_issues_parallel(issue_ids: list[int]):
+    """
+    複数Issueを並列で実装
+    各Issueをcontainer-workerエージェントでバックグラウンド並列処理
+    
+    ⚠️ 重要: background_task を使用すること
+    - task() ではMCPツール（container-use）が継承されない
+    - background_task() ではMCPツールが正しく継承される
+    """
+    
+    # 1. 依存関係チェック
+    dep_graph = check_dependencies(issue_ids)
+    if has_dependencies(dep_graph):
+        # 依存関係がある場合はトポロジカルソートして順次実行
+        sorted_groups = topological_sort(dep_graph)
+        for group in sorted_groups:
+            parallel_execute(group)
+        return
+    
+    # 2. 全Issue並列実行 - background_taskでcontainer-workerを起動
+    #    ⚠️ task() ではなく background_task() を使用（MCPツール継承のため）
+    task_ids = []
+    for issue_id in issue_ids:
+        # 各Issueに対してcontainer-workerをバックグラウンドで起動
+        task_id = background_task(
+            agent="container-worker",
+            description=f"Issue #{issue_id} 実装",
+            prompt=f"""
+## タスク
+Issue #{issue_id} を container-use 環境で実装し、PRを作成してください。
+
+## 実装手順
+1. ホスト側でブランチ作成: `feature/issue-{issue_id}-*`
+2. container-use環境構築（from_git_ref でブランチ指定）
+3. TDD実装（Red → Green → Refactor）
+4. Lint/型チェック/テスト実行
+5. 品質レビュー（backend-reviewer等で9点以上）
+6. コミット & プッシュ（container内で実行）
+7. PR作成（日本語、container内で実行）
+
+## 期待する出力
+以下の情報を返してください：
+- PR URL
+- 実装サマリー
+- テスト結果（パス/フェイル数）
+- レビュースコア
+- 環境ID（container-use log/checkout用）
+
+## 参照すべきドキュメント
+- 詳細設計書: docs/designs/detailed/
+- 技術調査レポート: docs/research/
+"""
+        )
+        task_ids.append((issue_id, task_id))
+    
+    # 3. 結果収集（各タスクの完了を待機）
+    results = []
+    for issue_id, task_id in task_ids:
+        result = background_output(task_id=task_id)
+        results.append((issue_id, result))
+    
+    # 4. 結果報告
+    report_all_results(results)
+
+
+def implement_single_issue(issue_id: int):
+    """
+    単一Issueの実装（従来フロー）
+    """
+    
     # 0. ブランチ作成 (ホスト側 - bashツール使用OK)
     branch_name = create_feature_branch(issue_id)  # bash("git checkout -b ...")
     
@@ -581,6 +1044,16 @@ def implement_issue(issue_id):
     commit_and_push_in_container(env)  # git add/commit/push
     create_pr_in_container(env)        # gh pr create (日本語)
 ```
+
+### 並列処理時の注意事項
+
+| 項目 | ルール |
+|------|--------|
+| **エージェント選択** | `container-worker` を使用 |
+| **環境分離** | 各Issueは別々のcontainer-use環境 |
+| **ブランチ分離** | 各Issueは別々のfeatureブランチ |
+| **結果待機** | 全エージェント完了まで待機 |
+| **エラーハンドリング** | 1つ失敗しても他は継続 |
 
 ## 参考
 
