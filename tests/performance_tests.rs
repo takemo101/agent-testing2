@@ -423,7 +423,7 @@ async fn tc_p_005_event_channel_memory() {
 /// the timer doesn't busy-wait.
 #[tokio::test]
 async fn tc_p_006_no_busy_wait() {
-    let engine = create_engine();
+    let (engine, _rx) = create_engine_with_rx();
 
     // Verify tick() doesn't need to be called constantly
     {
