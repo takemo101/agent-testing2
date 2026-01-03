@@ -143,12 +143,12 @@ impl NotificationDelegate {
         unsafe { msg_send![super(this), init] }
     }
 
-    /// Converts this delegate to a protocol object.
+    /// Converts a retained delegate to a protocol object.
     #[must_use]
     pub fn as_protocol(
-        self: &Retained<Self>,
+        delegate: &Retained<Self>,
     ) -> Retained<ProtocolObject<dyn UNUserNotificationCenterDelegate>> {
-        ProtocolObject::from_retained(self.clone())
+        ProtocolObject::from_retained(delegate.clone())
     }
 }
 
