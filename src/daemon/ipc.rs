@@ -14,7 +14,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 
-use crate::types::{IpcRequest, IpcResponse, ResponseData, StartParams};
+use crate::types::{IpcRequest, IpcResponse, PomodoroConfig, ResponseData, StartParams};
 
 use super::timer::TimerEngine;
 
@@ -28,8 +28,7 @@ pub const DEFAULT_SOCKET_PATH: &str = "~/.pomodoro/pomodoro.sock";
 /// Maximum request size in bytes (4KB)
 const MAX_REQUEST_SIZE: usize = 4096;
 
-/// Connection timeout in seconds (for future use with concurrent connections)
-#[allow(dead_code)]
+/// Connection timeout in seconds
 const CONNECTION_TIMEOUT_SECS: u64 = 30;
 
 /// Read timeout in seconds
@@ -119,11 +118,7 @@ impl IpcServer {
     ///
     /// Returns an error if the connection cannot be accepted.
     pub async fn accept(&self) -> Result<UnixStream> {
-        let (stream, _addr) = self
-            .listener
-            .accept()
-            .await
-            .context("Failed to accept connection")?;
+        let (stream, _addr) = self.listener.accept().await.context("Failed to accept connection")?;
         Ok(stream)
     }
 
@@ -167,10 +162,7 @@ impl IpcServer {
     pub async fn send_response(stream: &mut UnixStream, response: &IpcResponse) -> Result<()> {
         let json = serde_json::to_vec(response).context("Failed to serialize IPC response")?;
 
-        stream
-            .write_all(&json)
-            .await
-            .context("Failed to write response")?;
+        stream.write_all(&json).await.context("Failed to write response")?;
         stream.flush().await.context("Failed to flush response")?;
 
         Ok(())
@@ -194,28 +186,6 @@ impl Drop for IpcServer {
 // ============================================================================
 
 /// Handles IPC requests by dispatching to TimerEngine.
-///
-/// # Architecture Note
-///
-/// This handler uses `Arc<Mutex<TimerEngine>>` for synchronization.
-/// In the production Daemon implementation, the timer tick loop and IPC
-/// handling run as separate tasks coordinated via `tokio::select!`:
-///
-/// ```text
-/// loop {
-///     tokio::select! {
-///         _ = ticker.tick() => { /* tick processing */ }
-///         Ok(stream) = ipc_server.accept() => { /* handle IPC request */ }
-///     }
-/// }
-/// ```
-///
-/// This design ensures the mutex is only held briefly during command
-/// execution, not during the entire timer loop. The timer loop controls
-/// the tick timing, while IPC requests modify the shared state atomically.
-///
-/// For high-concurrency scenarios, consider the Actor pattern with
-/// message channels (see daemon-server.md Section 4 for details).
 pub struct RequestHandler {
     /// Shared reference to the timer engine
     engine: Arc<Mutex<TimerEngine>>,
@@ -353,7 +323,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::daemon::timer::TimerEvent;
-    use crate::types::PomodoroConfig;
+    use crate::types::TimerPhase;
 
     // ------------------------------------------------------------------------
     // Helper functions
@@ -361,10 +331,7 @@ mod tests {
 
     fn create_temp_socket_path() -> PathBuf {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.sock");
-        // Keep the directory so it's not deleted
-        std::mem::forget(dir);
-        path
+        dir.into_path().join("test.sock")
     }
 
     fn create_engine() -> (Arc<Mutex<TimerEngine>>, mpsc::UnboundedReceiver<TimerEvent>) {
@@ -505,9 +472,7 @@ mod tests {
 
             let mut stream = server.accept().await.unwrap();
             let response = IpcResponse::success("Test message", None);
-            IpcServer::send_response(&mut stream, &response)
-                .await
-                .unwrap();
+            IpcServer::send_response(&mut stream, &response).await.unwrap();
 
             let received = client_handle.await.unwrap();
             assert_eq!(received.status, "success");
@@ -799,9 +764,7 @@ mod tests {
             let mut stream = server.accept().await.unwrap();
             let request = IpcServer::receive_request(&mut stream).await.unwrap();
             let response = handler.handle(request).await;
-            IpcServer::send_response(&mut stream, &response)
-                .await
-                .unwrap();
+            IpcServer::send_response(&mut stream, &response).await.unwrap();
 
             // Verify client received correct response
             let client_response = client_handle.await.unwrap();
@@ -837,9 +800,7 @@ mod tests {
             let mut stream1 = server.accept().await.unwrap();
             let req1 = IpcServer::receive_request(&mut stream1).await.unwrap();
             let resp1 = handler.handle(req1).await;
-            IpcServer::send_response(&mut stream1, &resp1)
-                .await
-                .unwrap();
+            IpcServer::send_response(&mut stream1, &resp1).await.unwrap();
 
             let result1 = client1.await.unwrap();
             assert_eq!(result1.status, "success");
@@ -860,9 +821,7 @@ mod tests {
             let mut stream2 = server.accept().await.unwrap();
             let req2 = IpcServer::receive_request(&mut stream2).await.unwrap();
             let resp2 = handler.handle(req2).await;
-            IpcServer::send_response(&mut stream2, &resp2)
-                .await
-                .unwrap();
+            IpcServer::send_response(&mut stream2, &resp2).await.unwrap();
 
             let result2 = client2.await.unwrap();
             assert_eq!(result2.status, "success");
@@ -872,6 +831,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_all_commands_flow() {
+            let socket_path = create_temp_socket_path();
             let (engine, _rx) = create_engine();
             let handler = RequestHandler::new(engine);
 
