@@ -1,0 +1,234 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-release:
+    name: Build Release (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Strip binary
+        run: strip target/${{ matrix.target }}/release/pomodoro
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pomodoro-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/pomodoro
+
+  create-universal-binary:
+    name: Create Universal Binary
+    runs-on: macos-latest
+    needs: build-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download x86_64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: pomodoro-x86_64-apple-darwin
+          path: ./artifacts/x86_64
+
+      - name: Download aarch64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: pomodoro-aarch64-apple-darwin
+          path: ./artifacts/aarch64
+
+      - name: Create universal binary
+        run: |
+          lipo -create \
+            ./artifacts/x86_64/pomodoro \
+            ./artifacts/aarch64/pomodoro \
+            -output ./pomodoro-universal
+
+      - name: Verify universal binary
+        run: |
+          lipo -info ./pomodoro-universal
+          file ./pomodoro-universal
+
+      - name: Code sign binary
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          # キーチェーン作成
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          # 証明書インポート
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+
+          # 証明書の信頼設定
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # コード署名
+          codesign --force --sign "$SIGNING_IDENTITY" \
+            --options runtime \
+            --timestamp \
+            ./pomodoro-universal
+
+          # 署名検証
+          codesign --verify --verbose ./pomodoro-universal
+          spctl --assess --verbose ./pomodoro-universal
+
+      - name: Create tarball
+        run: |
+          tar -czf pomodoro-universal-macos.tar.gz pomodoro-universal
+          shasum -a 256 pomodoro-universal-macos.tar.gz > pomodoro-universal-macos.tar.gz.sha256
+
+      - name: Upload universal binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pomodoro-universal
+          path: |
+            pomodoro-universal-macos.tar.gz
+            pomodoro-universal-macos.tar.gz.sha256
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: macos-latest
+    needs: create-universal-binary
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download universal binary
+        uses: actions/download-artifact@v4
+        with:
+          name: pomodoro-universal
+          path: ./release
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## ポモドーロタイマーCLI v${{ steps.version.outputs.version }}
+
+            ### インストール方法
+
+            #### Homebrew（推奨）
+            ```bash
+            brew tap takemo101/pomodoro
+            brew install pomodoro
+            ```
+
+            #### 手動インストール
+            ```bash
+            # ダウンロード
+            curl -LO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/pomodoro-universal-macos.tar.gz
+
+            # SHA256チェックサム検証
+            curl -LO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/pomodoro-universal-macos.tar.gz.sha256
+            shasum -a 256 -c pomodoro-universal-macos.tar.gz.sha256
+
+            # 解凍
+            tar -xzf pomodoro-universal-macos.tar.gz
+
+            # インストール
+            sudo mv pomodoro-universal /usr/local/bin/pomodoro
+            sudo chmod +x /usr/local/bin/pomodoro
+            ```
+
+            ### 動作確認
+            ```bash
+            pomodoro --version
+            ```
+
+            ### 変更内容
+            - 詳細は [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) を参照
+
+            ### システム要件
+            - macOS 12 (Monterey) 以降
+            - Intel Mac または Apple Silicon Mac
+          files: |
+            ./release/pomodoro-universal-macos.tar.gz
+            ./release/pomodoro-universal-macos.tar.gz.sha256
+          draft: false
+          prerelease: false
+
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    runs-on: macos-latest
+    needs: create-github-release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew formula
+        if: env.HOMEBREW_GITHUB_API_TOKEN != ''
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        run: |
+          # Homebrew formulaリポジトリをクローン
+          git clone https://github.com/takemo101/homebrew-pomodoro.git
+          cd homebrew-pomodoro
+
+          # SHA256取得
+          SHA256=$(curl -sL https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/pomodoro-universal-macos.tar.gz | shasum -a 256 | awk '{print $1}')
+
+          # Formula更新
+          cat > Formula/pomodoro.rb <<EOF
+          class Pomodoro < Formula
+            desc "macOS専用のポモドーロタイマーCLIツール"
+            homepage "https://github.com/${{ github.repository }}"
+            url "https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/pomodoro-universal-macos.tar.gz"
+            sha256 "$SHA256"
+            version "${{ steps.version.outputs.version }}"
+
+            def install
+              bin.install "pomodoro-universal" => "pomodoro"
+            end
+
+            test do
+              system "#{bin}/pomodoro", "--version"
+            end
+          end
+          EOF
+
+          # コミット・プッシュ
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/pomodoro.rb
+          git commit -m "Update pomodoro to v${{ steps.version.outputs.version }}"
+          git push
