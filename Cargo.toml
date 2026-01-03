@@ -40,7 +40,7 @@ crossbeam-channel = "0.5"
 plist = "1.6"
 
 # Home directory detection for LaunchAgent paths
-dirs = "5.0"
+dirs = "6.0"
 
 # macOS-specific dependencies for notification system
 [target.'cfg(target_os = "macos")'.dependencies]
