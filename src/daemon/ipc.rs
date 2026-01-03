@@ -28,7 +28,8 @@ pub const DEFAULT_SOCKET_PATH: &str = "~/.pomodoro/pomodoro.sock";
 /// Maximum request size in bytes (4KB)
 const MAX_REQUEST_SIZE: usize = 4096;
 
-/// Connection timeout in seconds
+/// Connection timeout in seconds (for future use with concurrent connections)
+#[allow(dead_code)]
 const CONNECTION_TIMEOUT_SECS: u64 = 30;
 
 /// Read timeout in seconds
