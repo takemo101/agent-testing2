@@ -331,7 +331,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::daemon::timer::TimerEvent;
-    use crate::types::TimerPhase;
+    use crate::types::PomodoroConfig;
 
     // ------------------------------------------------------------------------
     // Helper functions
@@ -339,7 +339,10 @@ mod tests {
 
     fn create_temp_socket_path() -> PathBuf {
         let dir = tempfile::tempdir().unwrap();
-        dir.into_path().join("test.sock")
+        let path = dir.path().join("test.sock");
+        // Keep the directory so it's not deleted
+        std::mem::forget(dir);
+        path
     }
 
     fn create_engine() -> (Arc<Mutex<TimerEngine>>, mpsc::UnboundedReceiver<TimerEvent>) {
@@ -847,7 +850,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_all_commands_flow() {
-            let socket_path = create_temp_socket_path();
+            let _socket_path = create_temp_socket_path();
             let (engine, _rx) = create_engine();
             let handler = RequestHandler::new(engine);
 
