@@ -49,11 +49,7 @@ impl TimerPhase {
     }
 }
 
-impl Default for TimerPhase {
-    fn default() -> Self {
-        TimerPhase::Stopped
-    }
-}
+
 
 // ============================================================================
 // PomodoroConfig
