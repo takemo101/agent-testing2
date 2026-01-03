@@ -25,6 +25,17 @@ flowchart TB
             REQ3 -->|"合格"| REQ_OUT
         end
         
+        %% 技術キャッチアップワークフロー
+        subgraph TECH["/tech-catchup-workflow<br/>技術キャッチアップ"]
+            direction TB
+            TECH1["調査対象特定<br/>優先度付け"]
+            TECH2["最新情報収集<br/>@librarian"]
+            TECH3["技術調査レポート作成"]
+            TECH_OUT[["TECH-XXX.md<br/>技術調査レポート"]]
+            
+            TECH1 --> TECH2 --> TECH3 --> TECH_OUT
+        end
+        
         %% 基本設計ワークフロー
         subgraph BASIC["/basic-design-workflow<br/>基本設計完全ワークフロー"]
             direction TB
@@ -86,9 +97,13 @@ flowchart TB
         
         %% フロー接続
         IDEA --> REQ
-        REQ_OUT --> BASIC
+        REQ_OUT --> TECH
+        TECH_OUT --> BASIC
         BASIC_OUT --> DETAIL
         DETAIL_OUT --> IMPL
+        
+        %% 技術キャッチアップはスキップ可能
+        REQ_OUT -.->|"スキップ可"| BASIC
     end
 
     %% スタイル
@@ -99,9 +114,10 @@ flowchart TB
     classDef human fill:#ffccbc,stroke:#d84315
     
     class IDEA inputNode
-    class REQ_OUT,BASIC_OUT,DETAIL_OUT,IMPL_OUT outputNode
+    class REQ_OUT,BASIC_OUT,DETAIL_OUT,IMPL_OUT,TECH_OUT outputNode
     class REQ3,BASIC3,DETAIL4 reviewNode
     class PR_REVIEW human
+    class TECH processNode
 ```
 
 ---
@@ -111,9 +127,12 @@ flowchart TB
 | コマンド | 入力 | 出力 | 合格基準 |
 |---------|------|------|---------|
 | `/req-workflow` | アイデア・メモ | 要件定義書 (REQ-XXX.md) | 8点以上 |
-| `/basic-design-workflow` | 要件定義書 | 基本設計書 (BASIC-XXX.md) | 9点以上 |
+| `/tech-catchup-workflow` | 技術リスト / 要件定義書 | 技術調査レポート (TECH-XXX.md) | - (調査完了) |
+| `/basic-design-workflow` | 要件定義書 + 技術調査レポート | 基本設計書 (BASIC-XXX.md) | 9点以上 |
 | `/detailed-design-workflow` | 基本設計書 | 詳細設計書群 + テスト項目書 + Issues | 9点以上 |
 | `/implement-issues` | GitHub Issues | 実装コード + PR | 9点以上（全レビュアー） |
+
+> **Note**: `/tech-catchup-workflow` は任意実行。全技術が既知かつ最新の場合はスキップ可能。
 
 ---
 
@@ -182,6 +201,8 @@ docs/
 ├── memos/                        # アイデア・メモ（入力）
 │   ├── archive/                  # 解決済みメモ
 │   └── *.md
+├── research/                     # 技術調査レポート
+│   └── TECH-[カテゴリ]-NNN_技術名.md
 ├── requirements/                 # 要件定義書
 │   └── REQ-XXX-NNN_機能名.md
 └── designs/
@@ -216,13 +237,16 @@ docs/
 # 2. 要件定義書を作成
 /req-workflow "プロジェクト: ECサイト, ビジネス: 売上向上, メモ: docs/memos/my-idea.md"
 
-# 3. 基本設計書を作成
+# 3. 技術キャッチアップ（推奨）
+/tech-catchup-workflow "技術: Next.js 15, Prisma, 深度: standard, 要件: docs/requirements/REQ-FT-001_ECサイト.md"
+
+# 4. 基本設計書を作成
 /basic-design-workflow "docs/requirements/REQ-FT-001_ECサイト.md"
 
-# 4. 詳細設計書を作成
+# 5. 詳細設計書を作成
 /detailed-design-workflow "docs/designs/basic/BASIC-FT-001_ECサイト.md"
 
-# 5. 実装開始
+# 6. 実装開始
 /implement-issues
 ```
 
