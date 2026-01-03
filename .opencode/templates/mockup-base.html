@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{SCREEN_NAME}} - Wireframe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#000000', // Wireframe: Black
+            secondary: '#666666', // Wireframe: Gray
+            error: '#000000', // Wireframe: Black (use text/icon for error)
+            bg: '#ffffff',
+            surface: '#f3f4f6', // gray-100
+            border: '#e5e7eb', // gray-200
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Wireframe Styles: Force grayscale and borders */
+    body {
+      background-color: #ffffff;
+      color: #000000;
+      font-family: sans-serif;
+    }
+    
+    /* Box placeholders */
+    .wf-box {
+      border: 2px solid #e5e7eb;
+      background-color: #f9fafb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #9ca3af;
+      font-size: 0.875rem;
+    }
+
+    /* Images as crossed boxes */
+    img {
+      opacity: 0.5;
+      filter: grayscale(100%);
+      border: 1px dashed #000;
+    }
+
+    /* Interactive elements */
+    button, .btn {
+      border: 2px solid #000000;
+      background: transparent;
+      color: #000000;
+      font-weight: bold;
+    }
+    button.primary, .btn-primary {
+      background: #000000;
+      color: #ffffff;
+    }
+    
+    /* Inputs */
+    input, select, textarea {
+      border: 1px solid #000000 !important;
+      background: #ffffff;
+      border-radius: 0;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 flex flex-col items-center">
+  <div class="w-full max-w-4xl border border-gray-200 p-8 shadow-none">
+    <h1 class="text-2xl font-bold mb-4 border-b border-black pb-2">{{SCREEN_NAME}} ({{SCREEN_ID}})</h1>
+    
+    {{CONTENT}}
+    
+  </div>
+  
+  <div class="mt-8 text-xs text-gray-500">
+    Wireframe Mode | {{SCREEN_ID}}
+  </div>
+</body>
+</html>
