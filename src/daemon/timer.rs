@@ -453,10 +453,7 @@ mod tests {
             let result = engine.start(None);
 
             assert!(result.is_err());
-            assert!(result
-                .unwrap_err()
-                .to_string()
-                .contains("既に実行中"));
+            assert!(result.unwrap_err().to_string().contains("既に実行中"));
         }
 
         #[test]
@@ -843,9 +840,7 @@ mod tests {
             let _ = rx.try_recv(); // consume WorkStarted
 
             // Run the engine in a separate task
-            let handle = tokio::spawn(async move {
-                engine.run().await
-            });
+            let handle = tokio::spawn(async move { engine.run().await });
 
             // Wait for at least one tick event
             let result = timeout(Duration::from_secs(2), async {
@@ -909,9 +904,7 @@ mod tests {
             let _ = rx.try_recv(); // consume Paused
 
             // Run the engine in a separate task
-            let handle = tokio::spawn(async move {
-                engine.run().await
-            });
+            let handle = tokio::spawn(async move { engine.run().await });
 
             // Wait briefly
             tokio::time::sleep(Duration::from_millis(1500)).await;
@@ -938,9 +931,7 @@ mod tests {
             let _ = rx.try_recv(); // consume WorkStarted
 
             // Run the engine in a separate task
-            let handle = tokio::spawn(async move {
-                engine.run().await
-            });
+            let handle = tokio::spawn(async move { engine.run().await });
 
             // Wait for approximately 3 seconds
             tokio::time::sleep(Duration::from_millis(3100)).await;
