@@ -239,7 +239,12 @@ async fn tc_e_002_pause_resume_flow() {
 
     // Get remaining time before pause
     let status_before = client.status().await.unwrap();
-    let remaining_before = status_before.data.as_ref().unwrap().remaining_seconds.unwrap();
+    let remaining_before = status_before
+        .data
+        .as_ref()
+        .unwrap()
+        .remaining_seconds
+        .unwrap();
 
     // Step 1: Pause
     let pause_response = client.pause().await.unwrap();
@@ -255,7 +260,12 @@ async fn tc_e_002_pause_resume_flow() {
 
     // Step 2: Verify remaining time is preserved
     let status_paused = client.status().await.unwrap();
-    let remaining_paused = status_paused.data.as_ref().unwrap().remaining_seconds.unwrap();
+    let remaining_paused = status_paused
+        .data
+        .as_ref()
+        .unwrap()
+        .remaining_seconds
+        .unwrap();
     assert_eq!(remaining_before, remaining_paused);
 
     // Step 3: Resume
@@ -278,7 +288,12 @@ async fn tc_e_002_pause_resume_flow() {
     }
 
     let status_resumed = client.status().await.unwrap();
-    let remaining_resumed = status_resumed.data.as_ref().unwrap().remaining_seconds.unwrap();
+    let remaining_resumed = status_resumed
+        .data
+        .as_ref()
+        .unwrap()
+        .remaining_seconds
+        .unwrap();
     assert!(remaining_resumed < remaining_paused);
 
     server_handle.abort();
@@ -327,7 +342,10 @@ async fn tc_e_003_stop_flow() {
 
     // Verify timer is running
     let status = client.status().await.unwrap();
-    assert_eq!(status.data.as_ref().unwrap().state, Some("working".to_string()));
+    assert_eq!(
+        status.data.as_ref().unwrap().state,
+        Some("working".to_string())
+    );
 
     // Step 1: Stop
     let stop_response = client.stop().await.unwrap();
@@ -406,7 +424,10 @@ async fn tc_e_004_auto_cycle_mode() {
 
     // Verify we're in break mode
     let status = client.status().await.unwrap();
-    assert_eq!(status.data.as_ref().unwrap().state, Some("breaking".to_string()));
+    assert_eq!(
+        status.data.as_ref().unwrap().state,
+        Some("breaking".to_string())
+    );
 
     // Step 3: Simulate break completion with auto-cycle to next work
     {
@@ -569,7 +590,10 @@ async fn test_e2e_full_session_workflow() {
 
     // Status check
     let response = client.status().await.unwrap();
-    assert_eq!(response.data.as_ref().unwrap().state, Some("working".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("working".to_string())
+    );
 
     // Stop
     let response = client.stop().await.unwrap();
@@ -578,7 +602,10 @@ async fn test_e2e_full_session_workflow() {
 
     // Verify stopped state
     let response = client.status().await.unwrap();
-    assert_eq!(response.data.as_ref().unwrap().state, Some("stopped".to_string()));
+    assert_eq!(
+        response.data.as_ref().unwrap().state,
+        Some("stopped".to_string())
+    );
 
     server_handle.abort();
 }
@@ -620,7 +647,10 @@ async fn test_e2e_rapid_start_stop_cycles() {
 
     // Verify final state is stopped
     let status = client.status().await.unwrap();
-    assert_eq!(status.data.as_ref().unwrap().state, Some("stopped".to_string()));
+    assert_eq!(
+        status.data.as_ref().unwrap().state,
+        Some("stopped".to_string())
+    );
 
     server_handle.abort();
 }
@@ -657,7 +687,10 @@ async fn test_e2e_multiple_pause_resume() {
 
     // Verify still running
     let status = client.status().await.unwrap();
-    assert_eq!(status.data.as_ref().unwrap().state, Some("working".to_string()));
+    assert_eq!(
+        status.data.as_ref().unwrap().state,
+        Some("working".to_string())
+    );
 
     server_handle.abort();
 }
