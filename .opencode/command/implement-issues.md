@@ -44,9 +44,12 @@ flowchart TB
 
 ## 実行プロセス
 
-### 0. ブランチ作成 (container-use環境作成前)
+### 0. ブランチ作成 (container-use環境作成前) ⚠️ 必須
 
 Issue着手時に、まず**featureブランチを作成**します。
+
+> **⚠️ 重要**: container-use環境が作成する `cu-*` ブランチを直接PRに使用してはいけません。
+> 必ずfeatureブランチを作成し、そのブランチで作業を行ってください。
 
 ```python
 # ホスト側でブランチ作成 (bashツール使用)
@@ -61,6 +64,12 @@ bash(f"git push -u origin feature/issue-{issue_id}-{short_description}")
 | `feature/issue-{N}-*` | 機能追加 |
 | `fix/issue-{N}-*` | バグ修正 |
 | `refactor/issue-{N}-*` | リファクタリング |
+
+**アンチパターン（禁止事項）**:
+| ❌ 禁止 | ✅ 正しい方法 |
+|--------|-------------|
+| `cu-*` ブランチから直接PRを作成 | featureブランチからPRを作成 |
+| ブランチ作成をスキップしてcontainer-use環境を開始 | 先にfeatureブランチを作成してからcontainer-use環境を作成 |
 
 ### 1. container-use環境構築
 
