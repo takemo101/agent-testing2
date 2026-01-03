@@ -199,7 +199,8 @@ mod tests {
         // Actual results depend on the system
         let sounds = discover_system_sounds();
         // The result is a vector (may be empty in container environment)
-        assert!(sounds.len() >= 0);
+        // Just verify it doesn't panic and returns a valid vec
+        let _ = sounds.len();
     }
 
     #[test]
