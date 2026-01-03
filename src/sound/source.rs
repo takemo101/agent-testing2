@@ -72,10 +72,7 @@ impl SoundSource {
 }
 
 /// Directories to search for system sounds, in order of priority.
-const SYSTEM_SOUND_DIRS: &[&str] = &[
-    "/System/Library/Sounds",
-    "/Library/Sounds",
-];
+const SYSTEM_SOUND_DIRS: &[&str] = &["/System/Library/Sounds", "/Library/Sounds"];
 
 /// Supported audio file extensions.
 const SUPPORTED_EXTENSIONS: &[&str] = &["aiff", "wav", "mp3", "m4a", "flac"];
@@ -184,7 +181,7 @@ mod tests {
         let s1 = SoundSource::system("Glass", "/path/Glass.aiff");
         let s2 = SoundSource::system("Glass", "/path/Glass.aiff");
         let s3 = SoundSource::system("Ping", "/path/Ping.aiff");
-        
+
         assert_eq!(s1, s2);
         assert_ne!(s1, s3);
     }

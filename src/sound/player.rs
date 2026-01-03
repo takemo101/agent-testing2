@@ -114,8 +114,7 @@ impl RodioSoundPlayer {
             .map_err(|e| SoundError::FileNotFound(format!("{}: {}", path.display(), e)))?;
 
         let reader = BufReader::new(file);
-        let decoder = Decoder::new(reader)
-            .map_err(|e| SoundError::DecodeError(e.to_string()))?;
+        let decoder = Decoder::new(reader).map_err(|e| SoundError::DecodeError(e.to_string()))?;
 
         self.play_decoder(decoder)
     }
@@ -211,7 +210,7 @@ mod tests {
         };
 
         assert!(player.is_disabled());
-        
+
         // Playing should succeed silently
         let source = SoundSource::embedded("test");
         assert!(player.play(&source).is_ok());
@@ -225,10 +224,10 @@ mod tests {
         };
 
         assert!(player.is_disabled());
-        
+
         player.enable();
         assert!(!player.is_disabled());
-        
+
         player.disable();
         assert!(player.is_disabled());
     }
@@ -270,11 +269,8 @@ mod tests {
         };
 
         // Playing a non-existent system sound should fall back to embedded
-        let source = SoundSource::system(
-            "NonExistent",
-            "/nonexistent/path/to/sound.wav"
-        );
-        
+        let source = SoundSource::system("NonExistent", "/nonexistent/path/to/sound.wav");
+
         // Should fall back to embedded and succeed
         // (embedded might also fail if format unsupported, that's ok)
         let _ = player.play(&source);

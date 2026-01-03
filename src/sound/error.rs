@@ -70,7 +70,9 @@ mod tests {
     fn test_error_display() {
         let err = SoundError::DeviceNotAvailable("no device".to_string());
         assert!(err.to_string().contains("no device"));
-        assert!(err.to_string().contains("オーディオデバイスが利用できません"));
+        assert!(err
+            .to_string()
+            .contains("オーディオデバイスが利用できません"));
 
         let err = SoundError::FileNotFound("/path/to/sound.aiff".to_string());
         assert!(err.to_string().contains("/path/to/sound.aiff"));
