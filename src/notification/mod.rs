@@ -278,6 +278,153 @@ pub enum NotificationType {
     LongBreakComplete,
 }
 
+#[allow(async_fn_in_trait)]
+pub trait NotificationSender {
+    async fn send_work_complete(&self, task_name: Option<&str>) -> Result<(), NotificationError>;
+    async fn send_break_complete(&self, task_name: Option<&str>) -> Result<(), NotificationError>;
+    async fn send_long_break_complete(
+        &self,
+        task_name: Option<&str>,
+    ) -> Result<(), NotificationError>;
+    fn try_recv_action(&self) -> Option<NotificationActionEvent>;
+    fn is_available(&self) -> bool;
+    fn clear_all(&self);
+}
+
+// Implement NotificationSender for NotificationManager
+#[cfg(target_os = "macos")]
+impl NotificationSender for NotificationManager {
+    async fn send_work_complete(&self, task_name: Option<&str>) -> Result<(), NotificationError> {
+        self.send_work_complete_notification(task_name).await
+    }
+
+    async fn send_break_complete(&self, task_name: Option<&str>) -> Result<(), NotificationError> {
+        self.send_break_complete_notification(task_name).await
+    }
+
+    async fn send_long_break_complete(
+        &self,
+        task_name: Option<&str>,
+    ) -> Result<(), NotificationError> {
+        self.send_long_break_complete_notification(task_name).await
+    }
+
+    fn try_recv_action(&self) -> Option<NotificationActionEvent> {
+        NotificationManager::try_recv_action(self)
+    }
+
+    fn is_available(&self) -> bool {
+        true
+    }
+
+    fn clear_all(&self) {
+        self.clear_all_notifications()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MockNotificationSender {
+    notifications: std::sync::Mutex<Vec<(NotificationType, Option<String>)>>,
+    action_events: std::sync::Mutex<Vec<NotificationActionEvent>>,
+    available: std::sync::atomic::AtomicBool,
+    should_fail: std::sync::atomic::AtomicBool,
+}
+
+impl MockNotificationSender {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            notifications: std::sync::Mutex::new(Vec::new()),
+            action_events: std::sync::Mutex::new(Vec::new()),
+            available: std::sync::atomic::AtomicBool::new(true),
+            should_fail: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    pub fn set_available(&self, available: bool) {
+        self.available
+            .store(available, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn set_should_fail(&self, should_fail: bool) {
+        self.should_fail
+            .store(should_fail, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn inject_action_event(&self, event: NotificationActionEvent) {
+        self.action_events.lock().unwrap().push(event);
+    }
+
+    #[must_use]
+    pub fn get_notifications(&self) -> Vec<(NotificationType, Option<String>)> {
+        self.notifications.lock().unwrap().clone()
+    }
+
+    #[must_use]
+    pub fn notification_count(&self) -> usize {
+        self.notifications.lock().unwrap().len()
+    }
+
+    pub fn clear_recorded(&self) {
+        self.notifications.lock().unwrap().clear();
+    }
+}
+
+impl NotificationSender for MockNotificationSender {
+    async fn send_work_complete(&self, task_name: Option<&str>) -> Result<(), NotificationError> {
+        if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(NotificationError::SendFailed("Mock failure".to_string()));
+        }
+        self.notifications
+            .lock()
+            .unwrap()
+            .push((NotificationType::WorkComplete, task_name.map(String::from)));
+        Ok(())
+    }
+
+    async fn send_break_complete(&self, task_name: Option<&str>) -> Result<(), NotificationError> {
+        if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(NotificationError::SendFailed("Mock failure".to_string()));
+        }
+        self.notifications
+            .lock()
+            .unwrap()
+            .push((NotificationType::BreakComplete, task_name.map(String::from)));
+        Ok(())
+    }
+
+    async fn send_long_break_complete(
+        &self,
+        task_name: Option<&str>,
+    ) -> Result<(), NotificationError> {
+        if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(NotificationError::SendFailed("Mock failure".to_string()));
+        }
+        self.notifications.lock().unwrap().push((
+            NotificationType::LongBreakComplete,
+            task_name.map(String::from),
+        ));
+        Ok(())
+    }
+
+    fn try_recv_action(&self) -> Option<NotificationActionEvent> {
+        let mut events = self.action_events.lock().unwrap();
+        if events.is_empty() {
+            None
+        } else {
+            Some(events.remove(0))
+        }
+    }
+
+    fn is_available(&self) -> bool {
+        self.available.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn clear_all(&self) {
+        // No-op for mock
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,5 +433,61 @@ mod tests {
     fn test_notification_type() {
         let nt = NotificationType::WorkComplete;
         assert_eq!(nt, NotificationType::WorkComplete);
+    }
+
+    #[tokio::test]
+    async fn test_mock_notification_sender_basic() {
+        let mock = MockNotificationSender::new();
+
+        // Send notifications
+        mock.send_work_complete(Some("Test Task")).await.unwrap();
+        mock.send_break_complete(None).await.unwrap();
+
+        // Verify
+        let notifications = mock.get_notifications();
+        assert_eq!(notifications.len(), 2);
+        assert_eq!(
+            notifications[0],
+            (
+                NotificationType::WorkComplete,
+                Some("Test Task".to_string())
+            )
+        );
+        assert_eq!(notifications[1], (NotificationType::BreakComplete, None));
+    }
+
+    #[tokio::test]
+    async fn test_mock_notification_sender_failure() {
+        let mock = MockNotificationSender::new();
+        mock.set_should_fail(true);
+
+        let result = mock.send_work_complete(None).await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mock_notification_sender_action_events() {
+        let mock = MockNotificationSender::new();
+
+        // Initially empty
+        assert!(mock.try_recv_action().is_none());
+
+        // Inject events
+        mock.inject_action_event(NotificationActionEvent::Pause);
+        mock.inject_action_event(NotificationActionEvent::Stop);
+
+        // Receive in order
+        assert_eq!(mock.try_recv_action(), Some(NotificationActionEvent::Pause));
+        assert_eq!(mock.try_recv_action(), Some(NotificationActionEvent::Stop));
+        assert!(mock.try_recv_action().is_none());
+    }
+
+    #[test]
+    fn test_mock_notification_sender_availability() {
+        let mock = MockNotificationSender::new();
+        assert!(mock.is_available());
+
+        mock.set_available(false);
+        assert!(!mock.is_available());
     }
 }

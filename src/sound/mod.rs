@@ -51,7 +51,6 @@ mod error;
 mod player;
 mod source;
 
-// Re-export public types
 pub use embedded::{get_embedded_sound, get_embedded_sound_format, DEFAULT_SOUND_DATA};
 pub use error::SoundError;
 pub use player::{try_create_player, RodioSoundPlayer};
@@ -103,6 +102,82 @@ impl SoundPlayer for RodioSoundPlayer {
 
     fn disable(&self) {
         RodioSoundPlayer::disable(self)
+    }
+}
+
+/// Mock sound player for testing.
+#[derive(Debug, Default)]
+pub struct MockSoundPlayer {
+    play_calls: std::sync::Mutex<Vec<SoundSource>>,
+    available: std::sync::atomic::AtomicBool,
+    disabled: std::sync::atomic::AtomicBool,
+    should_fail: std::sync::atomic::AtomicBool,
+}
+
+impl MockSoundPlayer {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            play_calls: std::sync::Mutex::new(Vec::new()),
+            available: std::sync::atomic::AtomicBool::new(true),
+            disabled: std::sync::atomic::AtomicBool::new(false),
+            should_fail: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    pub fn set_available(&self, available: bool) {
+        self.available
+            .store(available, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn set_should_fail(&self, should_fail: bool) {
+        self.should_fail
+            .store(should_fail, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[must_use]
+    pub fn play_count(&self) -> usize {
+        self.play_calls.lock().unwrap().len()
+    }
+
+    #[must_use]
+    pub fn get_play_calls(&self) -> Vec<SoundSource> {
+        self.play_calls.lock().unwrap().clone()
+    }
+
+    pub fn clear_calls(&self) {
+        self.play_calls.lock().unwrap().clear();
+    }
+}
+
+impl SoundPlayer for MockSoundPlayer {
+    fn play(&self, source: &SoundSource) -> Result<(), SoundError> {
+        if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(SoundError::PlaybackError("Mock failure".to_string()));
+        }
+        if self.disabled.load(std::sync::atomic::Ordering::SeqCst) {
+            return Ok(());
+        }
+        self.play_calls.lock().unwrap().push(source.clone());
+        Ok(())
+    }
+
+    fn is_available(&self) -> bool {
+        self.available.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn is_disabled(&self) -> bool {
+        self.disabled.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn enable(&self) {
+        self.disabled
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn disable(&self) {
+        self.disabled
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
