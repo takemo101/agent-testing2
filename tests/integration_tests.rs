@@ -40,11 +40,8 @@ fn create_engine() -> (Arc<Mutex<TimerEngine>>, mpsc::UnboundedReceiver<TimerEve
     (Arc::new(Mutex::new(engine)), rx)
 }
 
-/// Runs a mock daemon server that handles a single request.
-async fn run_single_request_server(
-    server: &IpcServer,
-    handler: &RequestHandler,
-) {
+/// Runs a single request-response cycle on the server.
+async fn handle_single_request(server: &IpcServer, handler: &RequestHandler) {
     let mut stream = server.accept().await.unwrap();
     let request = IpcServer::receive_request(&mut stream).await.unwrap();
     let response = handler.handle(request).await;
@@ -67,19 +64,20 @@ async fn tc_i_001_timer_start_via_ipc() {
     // Setup
     let socket_path = create_temp_socket_path();
     let (engine, _rx) = create_engine();
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
 
-    // Start server in background
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    // Create server and start listening
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+
+    // Start server handler in background
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    // Wait for server to be ready
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // Small delay for server to be ready
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Act: CLI client sends start command
     let client = IpcClient::with_socket_path(socket_path);
@@ -108,7 +106,7 @@ async fn tc_i_001_timer_start_via_ipc() {
     assert_eq!(data.task_name, Some("Integration Test Task".to_string()));
 
     // Cleanup
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 /// TC-I-001 variant: Start with custom timer settings
@@ -116,17 +114,16 @@ async fn tc_i_001_timer_start_via_ipc() {
 async fn tc_i_001_timer_start_with_custom_settings() {
     let socket_path = create_temp_socket_path();
     let (engine, _rx) = create_engine();
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
 
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     let client = IpcClient::with_socket_path(socket_path);
     let args = StartArgs {
@@ -145,7 +142,7 @@ async fn tc_i_001_timer_start_with_custom_settings() {
     let data = response.data.unwrap();
     assert_eq!(data.state, Some("working".to_string()));
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 // ============================================================================
@@ -171,17 +168,16 @@ async fn tc_i_002_timer_pause_via_ipc() {
         assert!(eng.get_state().is_running());
     }
 
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
 
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Act: Send pause command
     let client = IpcClient::with_socket_path(socket_path);
@@ -196,7 +192,7 @@ async fn tc_i_002_timer_pause_via_ipc() {
     let data = response.data.expect("Response should contain data");
     assert_eq!(data.state, Some("paused".to_string()));
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 /// TC-I-002 variant: Pause when timer is not running (error case)
@@ -204,17 +200,18 @@ async fn tc_i_002_timer_pause_via_ipc() {
 async fn tc_i_002_timer_pause_when_not_running() {
     let socket_path = create_temp_socket_path();
     let (engine, _rx) = create_engine();
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
 
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    // Create server first, then spawn handler
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // Small delay for server to be ready
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     let client = IpcClient::with_socket_path(socket_path);
     let result = client.pause().await;
@@ -228,7 +225,7 @@ async fn tc_i_002_timer_pause_when_not_running() {
         error_msg
     );
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 // ============================================================================
@@ -253,17 +250,16 @@ async fn tc_i_003_status_query_via_ipc() {
         eng.start(Some("Status Test".to_string())).unwrap();
     }
 
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
 
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Act
     let client = IpcClient::with_socket_path(socket_path);
@@ -280,7 +276,7 @@ async fn tc_i_003_status_query_via_ipc() {
     assert_eq!(data.pomodoro_count, Some(0));
     assert_eq!(data.task_name, Some("Status Test".to_string()));
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 /// TC-I-003 variant: Status query when stopped
@@ -288,17 +284,16 @@ async fn tc_i_003_status_query_via_ipc() {
 async fn tc_i_003_status_query_when_stopped() {
     let socket_path = create_temp_socket_path();
     let (engine, _rx) = create_engine();
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
 
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     let client = IpcClient::with_socket_path(socket_path);
     let response = client.status().await.unwrap();
@@ -308,7 +303,7 @@ async fn tc_i_003_status_query_when_stopped() {
     assert_eq!(data.state, Some("stopped".to_string()));
     assert_eq!(data.remaining_seconds, Some(0));
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 // ============================================================================
@@ -349,19 +344,17 @@ async fn tc_i_004_connection_error_when_daemon_not_running() {
 async fn tc_i_004_connection_timeout() {
     let socket_path = create_temp_socket_path();
 
-    // Create server that never responds
-    let _server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            // Accept connection but never respond
-            let _stream = server.accept().await.unwrap();
-            // Sleep forever
-            tokio::time::sleep(Duration::from_secs(3600)).await;
-        }
+    // Create server that accepts but never responds
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
+    let _server_handle = tokio::spawn(async move {
+        // Accept connection but never respond
+        let _stream = server_clone.accept().await.unwrap();
+        // Sleep forever
+        tokio::time::sleep(Duration::from_secs(3600)).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     let client = IpcClient::with_socket_path(socket_path);
 
@@ -400,24 +393,21 @@ async fn test_full_workflow_integration() {
     let (engine, _rx) = create_engine();
     let handler = Arc::new(RequestHandler::new(engine));
 
-    // Server that handles multiple requests
+    // Create server that handles multiple requests
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
     let handler_clone = handler.clone();
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-
-            // Handle 5 requests (start, pause, resume, stop, status)
-            for _ in 0..5 {
-                let mut stream = server.accept().await.unwrap();
-                let request = IpcServer::receive_request(&mut stream).await.unwrap();
-                let response = handler_clone.handle(request).await;
-                IpcServer::send_response(&mut stream, &response).await.unwrap();
-            }
+    let server_handle = tokio::spawn(async move {
+        // Handle 5 requests (start, pause, resume, stop, status)
+        for _ in 0..5 {
+            let mut stream = server_clone.accept().await.unwrap();
+            let request = IpcServer::receive_request(&mut stream).await.unwrap();
+            let response = handler_clone.handle(request).await;
+            IpcServer::send_response(&mut stream, &response).await.unwrap();
         }
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     let client = IpcClient::with_socket_path(socket_path);
 
@@ -446,7 +436,7 @@ async fn test_full_workflow_integration() {
     assert_eq!(response.status, "success");
     assert_eq!(response.data.as_ref().unwrap().state, Some("stopped".to_string()));
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 /// Test Japanese task names with Unicode
@@ -454,17 +444,16 @@ async fn test_full_workflow_integration() {
 async fn test_unicode_task_name() {
     let socket_path = create_temp_socket_path();
     let (engine, _rx) = create_engine();
-    let handler = RequestHandler::new(engine);
+    let handler = Arc::new(RequestHandler::new(engine));
 
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-            run_single_request_server(&server, &handler).await;
-        }
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
+    let handler_clone = handler.clone();
+    let server_handle = tokio::spawn(async move {
+        handle_single_request(&server_clone, &handler_clone).await;
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     let client = IpcClient::with_socket_path(socket_path);
     let args = StartArgs {
@@ -486,7 +475,7 @@ async fn test_unicode_task_name() {
         Some("🍅 ポモドーロ作業 - API実装 (v2.0)".to_string())
     );
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
 
 /// Test concurrent clients (sequential access)
@@ -496,23 +485,20 @@ async fn test_concurrent_clients_sequential() {
     let (engine, _rx) = create_engine();
     let handler = Arc::new(RequestHandler::new(engine));
 
+    let server = Arc::new(IpcServer::new(&socket_path).unwrap());
+    let server_clone = server.clone();
     let handler_clone = handler.clone();
-    let server_handle = tokio::spawn({
-        let socket_path = socket_path.clone();
-        async move {
-            let server = IpcServer::new(&socket_path).unwrap();
-
-            // Handle 3 requests
-            for _ in 0..3 {
-                let mut stream = server.accept().await.unwrap();
-                let request = IpcServer::receive_request(&mut stream).await.unwrap();
-                let response = handler_clone.handle(request).await;
-                IpcServer::send_response(&mut stream, &response).await.unwrap();
-            }
+    let server_handle = tokio::spawn(async move {
+        // Handle 3 requests
+        for _ in 0..3 {
+            let mut stream = server_clone.accept().await.unwrap();
+            let request = IpcServer::receive_request(&mut stream).await.unwrap();
+            let response = handler_clone.handle(request).await;
+            IpcServer::send_response(&mut stream, &response).await.unwrap();
         }
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Client 1: Start
     let client1 = IpcClient::with_socket_path(socket_path.clone());
@@ -529,5 +515,5 @@ async fn test_concurrent_clients_sequential() {
     let response3 = client3.stop().await.unwrap();
     assert_eq!(response3.status, "success");
 
-    server_handle.abort();
+    let _ = server_handle.await;
 }
