@@ -14,7 +14,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 
-use crate::types::{IpcRequest, IpcResponse, PomodoroConfig, ResponseData, StartParams};
+use crate::types::{IpcRequest, IpcResponse, ResponseData, StartParams};
 
 use super::timer::TimerEngine;
 
@@ -28,7 +28,8 @@ pub const DEFAULT_SOCKET_PATH: &str = "~/.pomodoro/pomodoro.sock";
 /// Maximum request size in bytes (4KB)
 const MAX_REQUEST_SIZE: usize = 4096;
 
-/// Connection timeout in seconds
+/// Connection timeout in seconds (used for graceful shutdown)
+#[allow(dead_code)]
 const CONNECTION_TIMEOUT_SECS: u64 = 30;
 
 /// Read timeout in seconds
@@ -118,7 +119,11 @@ impl IpcServer {
     ///
     /// Returns an error if the connection cannot be accepted.
     pub async fn accept(&self) -> Result<UnixStream> {
-        let (stream, _addr) = self.listener.accept().await.context("Failed to accept connection")?;
+        let (stream, _addr) = self
+            .listener
+            .accept()
+            .await
+            .context("Failed to accept connection")?;
         Ok(stream)
     }
 
@@ -162,7 +167,10 @@ impl IpcServer {
     pub async fn send_response(stream: &mut UnixStream, response: &IpcResponse) -> Result<()> {
         let json = serde_json::to_vec(response).context("Failed to serialize IPC response")?;
 
-        stream.write_all(&json).await.context("Failed to write response")?;
+        stream
+            .write_all(&json)
+            .await
+            .context("Failed to write response")?;
         stream.flush().await.context("Failed to flush response")?;
 
         Ok(())
@@ -472,7 +480,9 @@ mod tests {
 
             let mut stream = server.accept().await.unwrap();
             let response = IpcResponse::success("Test message", None);
-            IpcServer::send_response(&mut stream, &response).await.unwrap();
+            IpcServer::send_response(&mut stream, &response)
+                .await
+                .unwrap();
 
             let received = client_handle.await.unwrap();
             assert_eq!(received.status, "success");
@@ -764,7 +774,9 @@ mod tests {
             let mut stream = server.accept().await.unwrap();
             let request = IpcServer::receive_request(&mut stream).await.unwrap();
             let response = handler.handle(request).await;
-            IpcServer::send_response(&mut stream, &response).await.unwrap();
+            IpcServer::send_response(&mut stream, &response)
+                .await
+                .unwrap();
 
             // Verify client received correct response
             let client_response = client_handle.await.unwrap();
@@ -800,7 +812,9 @@ mod tests {
             let mut stream1 = server.accept().await.unwrap();
             let req1 = IpcServer::receive_request(&mut stream1).await.unwrap();
             let resp1 = handler.handle(req1).await;
-            IpcServer::send_response(&mut stream1, &resp1).await.unwrap();
+            IpcServer::send_response(&mut stream1, &resp1)
+                .await
+                .unwrap();
 
             let result1 = client1.await.unwrap();
             assert_eq!(result1.status, "success");
@@ -821,7 +835,9 @@ mod tests {
             let mut stream2 = server.accept().await.unwrap();
             let req2 = IpcServer::receive_request(&mut stream2).await.unwrap();
             let resp2 = handler.handle(req2).await;
-            IpcServer::send_response(&mut stream2, &resp2).await.unwrap();
+            IpcServer::send_response(&mut stream2, &resp2)
+                .await
+                .unwrap();
 
             let result2 = client2.await.unwrap();
             assert_eq!(result2.status, "success");
