@@ -324,7 +324,6 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::daemon::timer::TimerEvent;
-    use crate::types::TimerPhase;
 
     // ------------------------------------------------------------------------
     // Helper functions
