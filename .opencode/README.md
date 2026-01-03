@@ -263,6 +263,7 @@ docs/
 | [コード品質ルール](./skill/code-quality-rules.md) | 500行ルール、固定アーキテクチャ、命名規則 | 実装時 |
 | [インフラワークフロー](./skill/infra-workflow.md) | Terraform/Docker Composeの設計・実装フロー | インフラ構築時 |
 | [申し送り処理](./skill/handover-process.md) | BE↔FE間の申し送り処理ルール | 実装時 |
+| [反復レビュー](./skill/iterative-review.md) | OpenCode自己改善の修正→レビュー→修正ループ | **.opencode/修正時** |
 
 ---
 
@@ -364,6 +365,7 @@ container-use_environment_run_cmd(command="npm test")
 
 | 日付 | バージョン | 変更内容 |
 |:---|:---|:---|
+| 2026-01-03 | 3.3.0 | 反復レビュースキル追加: OpenCode自己改善のための修正→レビュー→修正ループを文書化 |
 | 2026-01-03 | 3.2.0 | ユーザー承認ゲート追加: 全ワークフロー（req/basic/detailed）に明示的な承認待ちフェーズを追加、environments.jsonをgitignore対象に |
 | 2026-01-02 | 3.1.0 | container-use統合: 実装ワークフローにコンテナ環境構築を必須化、ガイドドキュメント追加 |
 | 2026-01-02 | 3.0.0 | ai-framework機能取り込み: レビュー観点詳細化、500行ルール/固定アーキテクチャ、インフラワークフロー、申し送り処理 |
