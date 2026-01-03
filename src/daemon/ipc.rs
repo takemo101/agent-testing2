@@ -331,7 +331,10 @@ mod tests {
 
     fn create_temp_socket_path() -> PathBuf {
         let dir = tempfile::tempdir().unwrap();
-        dir.into_path().join("test.sock")
+        let path = dir.path().join("test.sock");
+        // Keep the directory so it's not deleted
+        std::mem::forget(dir);
+        path
     }
 
     fn create_engine() -> (Arc<Mutex<TimerEngine>>, mpsc::UnboundedReceiver<TimerEvent>) {
