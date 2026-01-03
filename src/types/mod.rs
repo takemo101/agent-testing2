@@ -389,12 +389,12 @@ mod tests {
         }
 
         #[test]
-        fn test_clone_and_copy() {
+        fn test_copy() {
             let phase = TimerPhase::Breaking;
-            let cloned = phase.clone();
             let copied = phase;
-            assert_eq!(phase, cloned);
+            let copied2 = phase;
             assert_eq!(phase, copied);
+            assert_eq!(copied, copied2);
         }
     }
 
