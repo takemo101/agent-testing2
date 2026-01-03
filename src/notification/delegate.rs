@@ -136,7 +136,9 @@ impl NotificationDelegate {
     /// This is useful for receiving notifications without handling actions.
     #[must_use]
     pub fn new_without_sender(mtm: MainThreadMarker) -> Retained<Self> {
-        let ivars = NotificationDelegateIvars { action_sender: None };
+        let ivars = NotificationDelegateIvars {
+            action_sender: None,
+        };
         let this = Self::alloc(mtm).set_ivars(ivars);
         unsafe { msg_send![super(this), init] }
     }
@@ -156,8 +158,14 @@ mod tests {
 
     #[test]
     fn test_notification_action_event_equality() {
-        assert_eq!(NotificationActionEvent::Pause, NotificationActionEvent::Pause);
-        assert_ne!(NotificationActionEvent::Pause, NotificationActionEvent::Stop);
+        assert_eq!(
+            NotificationActionEvent::Pause,
+            NotificationActionEvent::Pause
+        );
+        assert_ne!(
+            NotificationActionEvent::Pause,
+            NotificationActionEvent::Stop
+        );
     }
 
     #[test]

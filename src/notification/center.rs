@@ -48,7 +48,9 @@ impl NotificationCenter {
                 let result = if !error.is_null() {
                     let err_ref = unsafe { error.as_ref() }.unwrap();
                     let description = err_ref.localizedDescription();
-                    Err(NotificationError::AuthorizationFailed(description.to_string()))
+                    Err(NotificationError::AuthorizationFailed(
+                        description.to_string(),
+                    ))
                 } else {
                     Ok(granted)
                 };
@@ -60,9 +62,8 @@ impl NotificationCenter {
             Self::current().requestAuthorizationWithOptions_completionHandler(options, &block);
         }
 
-        rx.await.map_err(|_| {
-            NotificationError::InitializationFailed("Channel closed".to_string())
-        })?
+        rx.await
+            .map_err(|_| NotificationError::InitializationFailed("Channel closed".to_string()))?
     }
 
     /// Gets the current authorization status.
@@ -81,9 +82,8 @@ impl NotificationCenter {
             Self::current().getNotificationSettingsWithCompletionHandler(&block);
         }
 
-        rx.await.map_err(|_| {
-            NotificationError::InitializationFailed("Channel closed".to_string())
-        })
+        rx.await
+            .map_err(|_| NotificationError::InitializationFailed("Channel closed".to_string()))
     }
 
     /// Checks if notifications are authorized.
@@ -151,9 +151,8 @@ impl NotificationCenter {
             Self::current().addNotificationRequest_withCompletionHandler(request, Some(&block));
         }
 
-        rx.await.map_err(|_| {
-            NotificationError::SendFailed("Channel closed".to_string())
-        })?
+        rx.await
+            .map_err(|_| NotificationError::SendFailed("Channel closed".to_string()))?
     }
 
     /// Removes all pending notification requests.

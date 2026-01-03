@@ -103,10 +103,11 @@ impl NotificationManager {
     /// - System notification center is unavailable
     pub async fn new() -> Result<Self, NotificationError> {
         // Verify we're on the main thread
-        let mtm = MainThreadMarker::new()
-            .ok_or_else(|| NotificationError::InitializationFailed(
-                "通知システムはメインスレッドで初期化する必要があります".to_string()
-            ))?;
+        let mtm = MainThreadMarker::new().ok_or_else(|| {
+            NotificationError::InitializationFailed(
+                "通知システムはメインスレッドで初期化する必要があります".to_string(),
+            )
+        })?;
 
         // Request authorization
         let granted = NotificationCenter::request_authorization().await?;
@@ -140,7 +141,9 @@ impl NotificationManager {
             Ok(manager) => Some(manager),
             Err(NotificationError::UnsignedBinary) => {
                 tracing::warn!("⚠️  バイナリが署名されていません。通知機能は無効です。");
-                tracing::info!("署名するには: codesign --force --deep --sign - target/release/pomodoro");
+                tracing::info!(
+                    "署名するには: codesign --force --deep --sign - target/release/pomodoro"
+                );
                 None
             }
             Err(NotificationError::PermissionDenied) => {

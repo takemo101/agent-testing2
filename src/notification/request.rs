@@ -50,11 +50,7 @@ pub fn create_notification_request_with_id(
     let identifier = NSString::from_str(identifier);
 
     unsafe {
-        UNNotificationRequest::requestWithIdentifier_content_trigger(
-            &identifier,
-            content,
-            None,
-        )
+        UNNotificationRequest::requestWithIdentifier_content_trigger(&identifier, content, None)
     }
 }
 

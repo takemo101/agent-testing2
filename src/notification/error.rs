@@ -42,10 +42,7 @@ impl NotificationError {
     /// Returns true if this error is related to permissions.
     #[must_use]
     pub fn is_permission_error(&self) -> bool {
-        matches!(
-            self,
-            Self::PermissionDenied | Self::AuthorizationFailed(_)
-        )
+        matches!(self, Self::PermissionDenied | Self::AuthorizationFailed(_))
     }
 
     /// Returns true if this error might be resolved by code signing.
@@ -61,12 +58,8 @@ impl NotificationError {
             Self::AuthorizationFailed(_) => {
                 "システム環境設定 > 通知 でアプリの通知を許可してください"
             }
-            Self::PermissionDenied => {
-                "システム環境設定 > 通知 でアプリの通知を許可してください"
-            }
-            Self::UnsignedBinary => {
-                "codesign --force --deep --sign - target/release/pomodoro"
-            }
+            Self::PermissionDenied => "システム環境設定 > 通知 でアプリの通知を許可してください",
+            Self::UnsignedBinary => "codesign --force --deep --sign - target/release/pomodoro",
             Self::SendFailed(_) => "通知センターを確認してください",
             Self::InitializationFailed(_) => "アプリケーションを再起動してください",
             Self::InvalidInput(_) => "入力値を確認してください",
