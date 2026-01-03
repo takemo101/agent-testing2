@@ -42,6 +42,24 @@ Pomodoro Timer CLI（`pomodoro`）の使用中に問題が発生した場合の�
 - **`--no-sound` フラグを確認してください**:
   - タイマー開始時に `--no-sound` フラグを付けていないか確認してください。
 
+### 6. インストール・ビルド時のエラー
+#### `make install` または `make install-local` でエラーが発生する
+エラーメッセージに `rustc 1.xx.0 is not supported` や `requires rustc 1.xx` と表示される場合、お使いのRustコンパイラのバージョンが古いため、依存パッケージのビルドに失敗しています。
+
+**対処法**:
+1. Rustを最新版に更新します。
+   ```bash
+   rustup update
+   ```
+2. クロスコンパイル用ターゲットを追加します（`make install` の代わり）。
+   ```bash
+   rustup target add x86_64-apple-darwin aarch64-apple-darwin
+   ```
+3. 再度インストールを実行します。
+   ```bash
+   make install-local
+   ```
+
 ## ログの確認方法
 
 詳細な調査が必要な場合は、ログファイルを確認してください。
