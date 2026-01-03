@@ -9,11 +9,11 @@
 //! - Native macOS notification system (macOS only)
 //! - Menu bar UI with tray icon (macOS only)
 //! - Sound playback for timer notifications
-//! - LaunchAgent management for auto-start at login
+//! - Focus mode integration via Shortcuts.app (macOS only)
 
 pub mod cli;
 pub mod daemon;
-pub mod launchagent;
+pub mod focus;
 pub mod menubar;
 pub mod sound;
 pub mod types;
@@ -45,8 +45,8 @@ pub use sound::{
     SoundError, SoundSource,
 };
 
-// Re-export launchagent types
-pub use launchagent::{
-    get_log_dir, get_plist_path, get_status, is_installed, is_running, LaunchAgentError,
-    PomodoroLaunchAgent, ServiceStatus,
+// Re-export focus mode types
+pub use focus::{
+    disable_focus, disable_focus_with_timeout, enable_focus, enable_focus_with_timeout,
+    shortcuts_exists, FocusModeConfig, FocusModeError,
 };
