@@ -19,11 +19,10 @@ use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, Mutex};
 
 use pomodoro::cli::client::IpcClient;
-use pomodoro::cli::commands::StartArgs;
 use pomodoro::daemon::ipc::{IpcServer, RequestHandler};
 use pomodoro::daemon::timer::TimerEngine;
 use pomodoro::sound::{MockSoundPlayer, SoundPlayer, SoundSource};
-use pomodoro::types::PomodoroConfig;
+use pomodoro::types::{IpcRequest, PomodoroConfig, StartParams};
 
 #[cfg(target_os = "macos")]
 use pomodoro::notification::{MockNotificationSender, NotificationSender};
@@ -411,7 +410,7 @@ async fn tc_p_005_event_channel_memory() {
     }
 
     // Channel should handle many events without issues
-    assert!(tx.is_closed() == false);
+    assert!(!tx.is_closed());
 }
 
 // ============================================================================
@@ -469,95 +468,87 @@ async fn tc_p_006_no_busy_wait() {
 // ============================================================================
 
 /// Benchmark: Timer state transitions
-#[test]
-fn benchmark_timer_state_transitions() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    rt.block_on(async {
-        let (tx, _rx) = mpsc::unbounded_channel();
-        let mut engine = TimerEngine::new(PomodoroConfig::default(), tx);
-
-        let iterations = 1000;
-        let start = Instant::now();
-
-        for _ in 0..iterations {
-            engine.start(Some("Benchmark".to_string())).unwrap();
-            engine.pause().unwrap();
-            engine.resume().unwrap();
-            engine.stop().unwrap();
-        }
-
-        let duration = start.elapsed();
-        let per_iteration = duration / iterations;
-
-        eprintln!(
-            "Benchmark: {} state transitions in {:?} ({:?} per iteration)",
-            iterations * 4, // 4 transitions per iteration
-            duration,
-            per_iteration
-        );
-
-        // Each iteration (4 state changes) should be under 1ms
-        assert!(
-            per_iteration < Duration::from_millis(1),
-            "State transitions too slow: {:?} per iteration",
-            per_iteration
-        );
-    });
-}
-
-/// Benchmark: Timer ticks
-#[test]
-fn benchmark_timer_ticks() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    rt.block_on(async {
-        let (tx, _rx) = mpsc::unbounded_channel();
-        let mut engine = TimerEngine::new(PomodoroConfig::default(), tx);
-        engine.start(None).unwrap();
-
-        let iterations = 10000;
-        let start = Instant::now();
-
-        for _ in 0..iterations {
-            engine.tick();
-        }
-
-        let duration = start.elapsed();
-        let per_tick = duration / iterations;
-
-        eprintln!(
-            "Benchmark: {} ticks in {:?} ({:?} per tick)",
-            iterations, duration, per_tick
-        );
-
-        // Each tick should be under 100 microseconds
-        assert!(
-            per_tick < Duration::from_micros(100),
-            "Ticks too slow: {:?} per tick",
-            per_tick
-        );
-    });
-}
-
-/// Benchmark: IPC request serialization
-#[test]
-fn benchmark_ipc_serialization() {
-    use pomodoro::types::{IpcRequest, StartParams};
+#[tokio::test]
+async fn benchmark_timer_state_transitions() {
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut engine = TimerEngine::new(PomodoroConfig::default(), tx);
 
     let iterations = 1000;
     let start = Instant::now();
 
     for _ in 0..iterations {
-        let request = IpcRequest::Start(StartParams {
-            work_minutes: 25,
-            break_minutes: 5,
-            long_break_minutes: 15,
-            task_name: Some("Benchmark Task".to_string()),
-            auto_cycle: false,
-            focus_mode: false,
-            no_sound: false,
-        });
+        engine.start(Some("Benchmark".to_string())).unwrap();
+        engine.pause().unwrap();
+        engine.resume().unwrap();
+        engine.stop().unwrap();
+    }
+
+    let duration = start.elapsed();
+    let per_iteration = duration / iterations;
+
+    eprintln!(
+        "Benchmark: {} state transitions in {:?} ({:?} per iteration)",
+        iterations * 4, // 4 transitions per iteration
+        duration,
+        per_iteration
+    );
+
+    // Each iteration (4 state changes) should be under 1ms
+    assert!(
+        per_iteration < Duration::from_millis(1),
+        "State transitions too slow: {:?} per iteration",
+        per_iteration
+    );
+}
+
+/// Benchmark: Timer ticks
+#[tokio::test]
+async fn benchmark_timer_ticks() {
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let mut engine = TimerEngine::new(PomodoroConfig::default(), tx);
+    engine.start(None).unwrap();
+
+    let iterations = 10000;
+    let start = Instant::now();
+
+    for _ in 0..iterations {
+        let state = engine.get_state_mut();
+        state.tick();
+    }
+
+    let duration = start.elapsed();
+    let per_tick = duration / iterations;
+
+    eprintln!(
+        "Benchmark: {} ticks in {:?} ({:?} per tick)",
+        iterations, duration, per_tick
+    );
+
+    // Each tick should be under 100 microseconds
+    assert!(
+        per_tick < Duration::from_micros(100),
+        "Ticks too slow: {:?} per tick",
+        per_tick
+    );
+}
+
+/// Benchmark: IPC request serialization
+#[test]
+fn benchmark_ipc_serialization() {
+    let iterations = 1000;
+    let start = Instant::now();
+
+    for _ in 0..iterations {
+        let request = IpcRequest::Start {
+            params: StartParams {
+                work_minutes: Some(25),
+                break_minutes: Some(5),
+                long_break_minutes: Some(15),
+                task_name: Some("Benchmark Task".to_string()),
+                auto_cycle: Some(false),
+                focus_mode: Some(false),
+            },
+        };
         let _json = serde_json::to_string(&request).unwrap();
     }
 
