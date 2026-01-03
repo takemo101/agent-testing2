@@ -292,8 +292,8 @@ mod tests {
 
     #[test]
     fn test_default_sound_names() {
-        assert!(!DEFAULT_SOUND_NAMES.is_empty());
         assert!(DEFAULT_SOUND_NAMES.contains(&"Glass"));
+        assert!(DEFAULT_SOUND_NAMES.contains(&"Ping"));
     }
 
     #[test]
