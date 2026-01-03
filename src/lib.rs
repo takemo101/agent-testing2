@@ -7,9 +7,11 @@
 //! - CLI command parsing and display utilities
 //! - Type definitions for configuration and state
 //! - Native macOS notification system (macOS only)
+//! - Menu bar UI with tray icon (macOS only)
 
 pub mod cli;
 pub mod daemon;
+pub mod menubar;
 pub mod types;
 
 // macOS-specific notification system
@@ -25,4 +27,10 @@ pub use types::{
 #[cfg(target_os = "macos")]
 pub use notification::{
     NotificationActionEvent, NotificationError, NotificationManager, NotificationType,
+};
+
+// Re-export menubar types
+pub use menubar::{
+    EventHandler, IconManager, MenuAction, MenuBuilder, MenuConfig, MenuItemConfig, MenuItemId,
+    TrayIconManager, TrayUpdate,
 };
