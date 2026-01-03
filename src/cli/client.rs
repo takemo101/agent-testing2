@@ -123,12 +123,7 @@ impl IpcClient {
             match self.send_request(request).await {
                 Ok(response) => return Ok(response),
                 Err(e) => {
-                    tracing::warn!(
-                        "リクエスト失敗 (試行 {}/{}): {}",
-                        attempt,
-                        MAX_RETRIES,
-                        e
-                    );
+                    tracing::warn!("リクエスト失敗 (試行 {}/{}): {}", attempt, MAX_RETRIES, e);
                     last_error = Some(e);
 
                     if attempt < MAX_RETRIES {
@@ -190,8 +185,8 @@ impl IpcClient {
         }
 
         // Deserialize response
-        let response: IpcResponse = serde_json::from_slice(&buffer[..n])
-            .context("レスポンスのパースに失敗しました")?;
+        let response: IpcResponse =
+            serde_json::from_slice(&buffer[..n]).context("レスポンスのパースに失敗しました")?;
 
         // Check for error response
         if response.status == "error" {
