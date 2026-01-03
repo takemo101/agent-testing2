@@ -496,7 +496,7 @@ mod tests {
         fn test_validate_task_name_empty() {
             let result = validate_task_name("");
             assert!(result.is_err());
-            assert!(result.unwrap_err().contains("空"));
+            assert!(result.unwrap_err().contains('空'));
         }
 
         #[test]
