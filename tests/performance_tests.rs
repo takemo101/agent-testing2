@@ -39,11 +39,11 @@ fn create_temp_socket_path() -> PathBuf {
     path
 }
 
-/// Creates a default TimerEngine.
-fn create_engine() -> Arc<Mutex<TimerEngine>> {
-    let (tx, _rx) = mpsc::unbounded_channel();
+/// Creates a default TimerEngine with its event receiver.
+fn create_engine_with_rx() -> (Arc<Mutex<TimerEngine>>, mpsc::UnboundedReceiver<TimerEvent>) {
+    let (tx, rx) = mpsc::unbounded_channel();
     let config = PomodoroConfig::default();
-    Arc::new(Mutex::new(TimerEngine::new(config, tx)))
+    (Arc::new(Mutex::new(TimerEngine::new(config, tx))), rx)
 }
 
 /// Performance measurement result.
