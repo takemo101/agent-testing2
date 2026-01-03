@@ -36,3 +36,9 @@ pub use menubar::{
     EventHandler, IconManager, MenuAction, MenuBuilder, MenuConfig, MenuItemConfig, MenuItemId,
     TrayIconManager, TrayUpdate,
 };
+
+// Re-export sound types
+pub use sound::{
+    discover_system_sounds, get_default_sound, play_notification_sound, RodioSoundPlayer,
+    SoundError, SoundSource,
+};
