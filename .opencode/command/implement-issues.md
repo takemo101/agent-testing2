@@ -58,22 +58,26 @@ def implement_issues(issue_ids: list[int]):
         issue_ids: Issue番号のリスト（例: [9, 10]）
     """
     
-    # 1. 各Issueに対してcontainer-workerを並列起動
-    tasks = []
+    # 1. 各Issueに対してcontainer-workerをバックグラウンドで並列起動
+    #    ⚠️ background_task を使用することでMCPツール（container-use）が継承される
+    task_ids = []
     for issue_id in issue_ids:
-        task = task(
-            subagent_type="container-worker",
+        task_id = background_task(
+            agent="container-worker",
             description=f"Issue #{issue_id} 実装",
             prompt=generate_implementation_prompt(issue_id)
         )
-        tasks.append(task)
+        task_ids.append((issue_id, task_id))
     
-    # 2. 全タスクの完了を待機（並列実行中）
-    results = await asyncio.gather(*tasks)
+    # 2. 全タスクの完了を待機・結果収集
+    results = []
+    for issue_id, task_id in task_ids:
+        result = background_output(task_id=task_id)
+        results.append((issue_id, result))
     
     # 3. 結果を集約して報告
-    for result in results:
-        report_completion(result)
+    for issue_id, result in results:
+        report_completion(issue_id, result)
 ```
 
 ### container-worker プロンプト生成
@@ -121,6 +125,20 @@ Issue #{issue_id} を実装し、PRを作成してください。
 | **1 Issue = 1 container-use環境** | 各Issueは独立した環境で実装 |
 | **依存関係チェック** | 依存Issueがある場合は順次処理 |
 | **結果収集** | 全エージェント完了後にサマリー報告 |
+
+### ⚠️ 重要: `background_task` vs `task` の違い
+
+> **必ず `background_task` を使用すること。`task` ではMCPツールが継承されない。**
+
+| ツール | MCPツール継承 | container-use利用 |
+|--------|--------------|-------------------|
+| `background_task` | ✅ 継承される | ✅ 利用可能 |
+| `task` | ❌ 継承されない | ❌ 利用不可（ホスト環境にフォールバック） |
+
+**なぜこれが重要か**:
+- `task` を使用すると、container-workerエージェントは `container-use_*` MCPツールにアクセスできない
+- 結果として、エージェントはホスト環境の `edit`/`write`/`bash` ツールにフォールバックし、container-use環境が使用されない
+- `background_task` はMCP接続を正しくサブエージェントに継承するため、container-use環境での実装が可能
 
 ### 依存関係がある場合
 
@@ -874,7 +892,7 @@ config = {
 
 | フェーズ | 使用ツール | 禁止ツール |
 |---------|-----------|-----------|
-| **複数Issue並列処理** | **`task` + `container-worker`** | 順次処理 |
+| **複数Issue並列処理** | **`background_task` + `container-worker`** | `task`（MCPツール継承されない）、順次処理 |
 | ブランチ作成 | `bash` (git checkout/push のみ) | - |
 | 環境構築 | `container-use_environment_create` | - |
 | ファイル編集 | `container-use_environment_file_write` | `edit`, `write` |
@@ -908,7 +926,11 @@ def implement_issues(args: str):
 def implement_issues_parallel(issue_ids: list[int]):
     """
     複数Issueを並列で実装
-    各IssueをcontainerーworkerエージェントでSim時に処理
+    各Issueをcontainer-workerエージェントでバックグラウンド並列処理
+    
+    ⚠️ 重要: background_task を使用すること
+    - task() ではMCPツール（container-use）が継承されない
+    - background_task() ではMCPツールが正しく継承される
     """
     
     # 1. 依存関係チェック
@@ -920,12 +942,13 @@ def implement_issues_parallel(issue_ids: list[int]):
             parallel_execute(group)
         return
     
-    # 2. 全Issue並列実行 - container-workerエージェントを並列起動
-    tasks = []
+    # 2. 全Issue並列実行 - background_taskでcontainer-workerを起動
+    #    ⚠️ task() ではなく background_task() を使用（MCPツール継承のため）
+    task_ids = []
     for issue_id in issue_ids:
-        # 各Issueに対してcontainer-workerを起動
-        task_result = task(
-            subagent_type="container-worker",
+        # 各Issueに対してcontainer-workerをバックグラウンドで起動
+        task_id = background_task(
+            agent="container-worker",
             description=f"Issue #{issue_id} 実装",
             prompt=f"""
 ## タスク
@@ -946,16 +969,23 @@ Issue #{issue_id} を container-use 環境で実装し、PRを作成してくだ
 - 実装サマリー
 - テスト結果（パス/フェイル数）
 - レビュースコア
+- 環境ID（container-use log/checkout用）
 
 ## 参照すべきドキュメント
 - 詳細設計書: docs/designs/detailed/
 - 技術調査レポート: docs/research/
 """
         )
-        tasks.append(task_result)
+        task_ids.append((issue_id, task_id))
     
-    # 3. 結果収集・報告
-    report_all_results(tasks)
+    # 3. 結果収集（各タスクの完了を待機）
+    results = []
+    for issue_id, task_id in task_ids:
+        result = background_output(task_id=task_id)
+        results.append((issue_id, result))
+    
+    # 4. 結果報告
+    report_all_results(results)
 
 
 def implement_single_issue(issue_id: int):

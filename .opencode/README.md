@@ -372,7 +372,10 @@ container-use_environment_run_cmd(command="npm test")
 
 | 日付 | バージョン | 変更内容 |
 |:---|:---|:---|
+<<<<<<< Updated upstream
 | 2026-01-03 | 3.7.0 | **ドキュメント品質向上**: detailed-design-workflowに全体フロー図追加、request-design-fixにサーキットブレーカー・エラーハンドリング・擬似コード追加 |
+=======
+>>>>>>> Stashed changes
 | 2026-01-03 | 3.6.0 | **MCPツール継承修正**: 並列処理で `task` → `background_task` に変更。`task` ではMCPツール（container-use）がサブエージェントに継承されない問題を解決 |
 | 2026-01-03 | 3.5.0 | **並列実装ワークフロー強化**: `/implement-issues 9 10` で複数Issueを `container-worker` エージェントで並列処理、設計書存在チェック追加、PR作成前ユーザー承認ゲート追加 |
 | 2026-01-03 | 3.4.0 | 並行作業ガイドライン追加: container-use環境による複数Issue並行処理の必須化、プラットフォーム固有コードの例外ルールを明文化 |

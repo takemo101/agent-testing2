@@ -2,6 +2,104 @@
 
 基本設計書を入力として、詳細設計書を作成し、モックアップ生成とテスト設計までを一貫して行うワークフロー。
 
+## 入力
+
+$ARGUMENTS（基本設計書のパス）
+
+## 全体フロー図
+
+```mermaid
+flowchart TB
+    subgraph title["詳細設計・完全ワークフロー"]
+        direction TB
+        
+        INPUT[("基本設計書<br/>BASIC-XXX.md")]
+        
+        subgraph PHASE0["Phase 0: ドキュメント計画"]
+            P0_1["機能分解"]
+            P0_2["ドキュメント一覧作成"]
+            P0_3{"ユーザー確認"}
+        end
+        
+        subgraph PHASE1["Phase 1: 設計書作成"]
+            P1_1["詳細設計書.md"]
+            P1_2["バックエンド設計書.md"]
+            P1_3["フロントエンド設計書.md"]
+            P1_4["画面設計書.md"]
+            P1_5["共通設計書<br/>(DB/インフラ/セキュリティ)"]
+        end
+        
+        subgraph PHASE15["Phase 1.5: ASCII検証"]
+            P15_1["ASCII罫線チェック"]
+            P15_2{"検証OK?"}
+        end
+        
+        subgraph PHASE2["Phase 2: モックアップ生成"]
+            P2_1["HTML作成<br/>(Desktop/Mobile/Error)"]
+            P2_2["Playwright撮影"]
+            P2_3["画像埋め込み"]
+        end
+        
+        subgraph PHASE3["Phase 3: 品質保証ループ"]
+            P3_1["detailed-design-reviewer"]
+            P3_2{スコア >= 9?}
+        end
+        
+        subgraph PHASE4["Phase 4: テスト設計"]
+            P4_1["テスト項目書作成<br/>@test-spec-writer"]
+            P4_2["テストレビュー"]
+        end
+        
+        PHASE45{"Phase 4.5<br/>👤 ユーザー承認"}
+        
+        subgraph PHASE5["Phase 5: Issue化"]
+            P5_1["Epic Issue作成"]
+            P5_2["子Issue作成"]
+            P5_3["依存関係図<br/>(Mermaid)"]
+        end
+        
+        OUTPUT[("詳細設計書群<br/>+ テスト項目書<br/>+ GitHub Issues")]
+        
+        INPUT --> PHASE0
+        P0_1 --> P0_2 --> P0_3
+        P0_3 -->|承認| PHASE1
+        P0_3 -->|修正| P0_2
+        
+        P1_1 --> P1_2 --> P1_3 --> P1_4 --> P1_5
+        PHASE1 --> PHASE15
+        
+        P15_1 --> P15_2
+        P15_2 -->|NG| PHASE1
+        P15_2 -->|OK| PHASE2
+        
+        P2_1 --> P2_2 --> P2_3
+        PHASE2 --> PHASE3
+        
+        P3_1 --> P3_2
+        P3_2 -->|NG| PHASE1
+        P3_2 -->|OK| PHASE4
+        
+        P4_1 --> P4_2
+        PHASE4 --> PHASE45
+        
+        PHASE45 -->|承認| PHASE5
+        PHASE45 -->|修正| PHASE1
+        PHASE45 -->|中断| ABORT(("中断"))
+        
+        P5_1 --> P5_2 --> P5_3
+        PHASE5 --> OUTPUT
+    end
+    
+    classDef phaseNode fill:#e3f2fd,stroke:#1976d2
+    classDef approvalNode fill:#fff3e0,stroke:#f57c00
+    classDef outputNode fill:#e8f5e9,stroke:#388e3c
+    
+    class INPUT,OUTPUT outputNode
+    class P0_3,P3_2,P15_2,PHASE45 approvalNode
+```
+
+---
+
 **変更点(v2.5)**:
 - **ASCII自動検証の追加**: Phase 1完了時に画面設計書のASCII禁止チェックを自動実行（grepベース）。
 - **禁止パターン拡大**: ページネーション表示例、ローディング状態、カード形式のASCII表現も明示的に禁止。
