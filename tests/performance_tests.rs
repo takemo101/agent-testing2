@@ -39,7 +39,16 @@ fn create_temp_socket_path() -> PathBuf {
     path
 }
 
+/// Creates a default TimerEngine (without keeping the receiver).
+/// Note: This is suitable for tests that don't call start() on the engine.
+fn create_engine() -> Arc<Mutex<TimerEngine>> {
+    let (tx, _rx) = mpsc::unbounded_channel();
+    let config = PomodoroConfig::default();
+    Arc::new(Mutex::new(TimerEngine::new(config, tx)))
+}
+
 /// Creates a default TimerEngine with its event receiver.
+/// Use this when calling start() or other methods that send events.
 fn create_engine_with_rx() -> (Arc<Mutex<TimerEngine>>, mpsc::UnboundedReceiver<TimerEvent>) {
     let (tx, rx) = mpsc::unbounded_channel();
     let config = PomodoroConfig::default();
