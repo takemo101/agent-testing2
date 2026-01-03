@@ -7,6 +7,8 @@
 
 use clap::Parser;
 
+pub mod types;
+
 /// Pomodoro Timer CLI - Stay focused, stay productive
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
