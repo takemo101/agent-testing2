@@ -28,7 +28,7 @@ pub const DEFAULT_SOCKET_PATH: &str = "~/.pomodoro/pomodoro.sock";
 /// Maximum request size in bytes (4KB)
 const MAX_REQUEST_SIZE: usize = 4096;
 
-/// Connection timeout in seconds (for future use with concurrent connections)
+/// Connection timeout in seconds (used for graceful shutdown)
 #[allow(dead_code)]
 const CONNECTION_TIMEOUT_SECS: u64 = 30;
 
@@ -194,28 +194,6 @@ impl Drop for IpcServer {
 // ============================================================================
 
 /// Handles IPC requests by dispatching to TimerEngine.
-///
-/// # Architecture Note
-///
-/// This handler uses `Arc<Mutex<TimerEngine>>` for synchronization.
-/// In the production Daemon implementation, the timer tick loop and IPC
-/// handling run as separate tasks coordinated via `tokio::select!`:
-///
-/// ```text
-/// loop {
-///     tokio::select! {
-///         _ = ticker.tick() => { /* tick processing */ }
-///         Ok(stream) = ipc_server.accept() => { /* handle IPC request */ }
-///     }
-/// }
-/// ```
-///
-/// This design ensures the mutex is only held briefly during command
-/// execution, not during the entire timer loop. The timer loop controls
-/// the tick timing, while IPC requests modify the shared state atomically.
-///
-/// For high-concurrency scenarios, consider the Actor pattern with
-/// message channels (see daemon-server.md Section 4 for details).
 pub struct RequestHandler {
     /// Shared reference to the timer engine
     engine: Arc<Mutex<TimerEngine>>,
@@ -872,6 +850,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_all_commands_flow() {
+            let _socket_path = create_temp_socket_path();
             let (engine, _rx) = create_engine();
             let handler = RequestHandler::new(engine);
 
