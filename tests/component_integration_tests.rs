@@ -415,7 +415,13 @@ mod component_handler_integration {
                 TimerEvent::WorkStarted { .. } => {
                     self.focus_controller.enable().await.ok();
                 }
-                TimerEvent::WorkCompleted { task_name, .. } => {
+                TimerEvent::WorkCompleted {
+                    #[cfg(target_os = "macos")]
+                    task_name,
+                    #[cfg(not(target_os = "macos"))]
+                        task_name: _,
+                    ..
+                } => {
                     #[cfg(target_os = "macos")]
                     {
                         self.notification_sender

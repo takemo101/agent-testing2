@@ -58,6 +58,10 @@ tray-icon = "0.21"
 version = "0.20"
 default-features = true
 
+[features]
+default = []
+test-utils = []  # Expose internal APIs for integration testing
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"
