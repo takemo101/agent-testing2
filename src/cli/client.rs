@@ -502,27 +502,36 @@ mod tests {
             let socket_path = create_temp_socket_path();
             let listener = create_mock_server(&socket_path).await;
 
-            // Spawn mock server that returns error
+            // Spawn mock server that returns error (handles all retry attempts)
             let server_handle = tokio::spawn(async move {
-                let (mut stream, _) = listener.accept().await.unwrap();
+                // Handle up to MAX_RETRIES connections
+                for _ in 0..MAX_RETRIES {
+                    if let Ok((mut stream, _)) = listener.accept().await {
+                        // Read request
+                        let mut buffer = vec![0u8; 4096];
+                        let _ = stream.read(&mut buffer).await;
 
-                // Read request
-                let mut buffer = vec![0u8; 4096];
-                let _ = stream.read(&mut buffer).await.unwrap();
-
-                // Send error response
-                let response = IpcResponse::error("タイマーは既に実行中です");
-                let json = serde_json::to_vec(&response).unwrap();
-                stream.write_all(&json).await.unwrap();
+                        // Send error response
+                        let response = IpcResponse::error("タイマーは既に実行中です");
+                        let json = serde_json::to_vec(&response).unwrap();
+                        let _ = stream.write_all(&json).await;
+                    }
+                }
             });
 
             let client = IpcClient::with_socket_path(socket_path);
             let result = client.start(&StartArgs::default()).await;
 
             assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("既に実行中"));
+            let error_msg = result.unwrap_err().to_string();
+            assert!(
+                error_msg.contains("既に実行中"),
+                "Expected error message to contain '既に実行中', got: {}",
+                error_msg
+            );
 
-            server_handle.await.unwrap();
+            // Cancel the server task (it may be waiting for more connections)
+            server_handle.abort();
         }
     }
 
