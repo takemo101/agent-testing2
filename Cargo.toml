@@ -36,6 +36,12 @@ uuid = { version = "1.11", features = ["v4"] }
 # Cross-thread communication for tray icon updates
 crossbeam-channel = "0.5"
 
+# Plist generation for LaunchAgent
+plist = "1.6"
+
+# Home directory detection for LaunchAgent paths
+dirs = "5.0"
+
 # macOS-specific dependencies for notification system
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
