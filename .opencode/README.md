@@ -69,18 +69,25 @@ flowchart TB
         %% 実装ワークフロー
         subgraph IMPL["/implement-issues<br/>実装ワークフロー"]
             direction TB
-            I_START("Issue選択")
+            I_START("Issue選択<br/>⚡ 複数指定で並列処理")
+            I_DESIGN{"📋 設計書確認"}
             I_ENV["🐳 container-use<br/>環境構築"]
             I_SVC["サービス追加<br/>(DB/Redis等)"]
             I_TEST["🔴 テスト実装<br/>(Red)"]
             I_CODE["🟢 実装<br/>(Green)"]
             I_REF["🔵 リファクタリング"]
             I_CHECK{"品質検証<br/>AI Review<br/>9点以上"}
-            I_PR["PR作成"]
+            I_APPROVE{"👤 ユーザー承認<br/>PR作成許可"}
+            I_PR["🔀 PR作成"]
             
-            I_START --> I_ENV --> I_SVC --> I_TEST --> I_CODE --> I_REF --> I_CHECK
+            I_START --> I_DESIGN
+            I_DESIGN -->|"存在"| I_ENV
+            I_DESIGN -->|"不在"| DESIGN_FIX
+            I_ENV --> I_SVC --> I_TEST --> I_CODE --> I_REF --> I_CHECK
             I_CHECK -->|"修正"| I_CODE
-            I_CHECK -->|"OK"| I_PR
+            I_CHECK -->|"OK"| I_APPROVE
+            I_APPROVE -->|"承認"| I_PR
+            I_APPROVE -->|"却下"| I_CODE
         end
 
         %% フィードバックループ
@@ -130,7 +137,7 @@ flowchart TB
 | `/tech-catchup-workflow` | 技術リスト / 要件定義書 | 技術調査レポート (TECH-XXX.md) | - (調査完了) |
 | `/basic-design-workflow` | 要件定義書 + 技術調査レポート | 基本設計書 (BASIC-XXX.md) | 9点以上 |
 | `/detailed-design-workflow` | 基本設計書 | 詳細設計書群 + テスト項目書 + Issues | 9点以上 |
-| `/implement-issues` | GitHub Issues | 実装コード + PR | 9点以上（全レビュアー） |
+| `/implement-issues` | GitHub Issues | 実装コード + PR | 9点以上（全レビュアー）⚡並列対応 |
 
 > **Note**: `/tech-catchup-workflow` は任意実行。全技術が既知かつ最新の場合はスキップ可能。
 
@@ -365,6 +372,7 @@ container-use_environment_run_cmd(command="npm test")
 
 | 日付 | バージョン | 変更内容 |
 |:---|:---|:---|
+| 2026-01-03 | 3.5.0 | **並列実装ワークフロー強化**: `/implement-issues 9 10` で複数Issueを `container-worker` エージェントで並列処理、設計書存在チェック追加、PR作成前ユーザー承認ゲート追加 |
 | 2026-01-03 | 3.4.0 | 並行作業ガイドライン追加: container-use環境による複数Issue並行処理の必須化、プラットフォーム固有コードの例外ルールを明文化 |
 | 2026-01-03 | 3.3.0 | 反復レビュースキル追加: OpenCode自己改善のための修正→レビュー→修正ループを文書化 |
 | 2026-01-03 | 3.2.0 | ユーザー承認ゲート追加: 全ワークフロー（req/basic/detailed）に明示的な承認待ちフェーズを追加、environments.jsonをgitignore対象に |
