@@ -332,19 +332,19 @@ mod tests {
         #[test]
         fn test_phase_changed_sequence() {
             let mut manager = IconManager::new();
-            
+
             // First call
             assert!(manager.phase_changed(&TimerPhase::Stopped));
-            
+
             // Same phase
             assert!(!manager.phase_changed(&TimerPhase::Stopped));
-            
+
             // Different phase
             assert!(manager.phase_changed(&TimerPhase::Working));
-            
+
             // Same phase again
             assert!(!manager.phase_changed(&TimerPhase::Working));
-            
+
             // Another different phase
             assert!(manager.phase_changed(&TimerPhase::Paused));
         }

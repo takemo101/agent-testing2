@@ -246,10 +246,7 @@ impl TrayIconManager {
 
     /// Builds a native menu from the configuration (macOS only).
     #[cfg(target_os = "macos")]
-    fn build_native_menu(
-        &self,
-        config: &MenuConfig,
-    ) -> anyhow::Result<tray_icon::menu::Menu> {
+    fn build_native_menu(&self, config: &MenuConfig) -> anyhow::Result<tray_icon::menu::Menu> {
         use tray_icon::menu::{Menu, MenuItem, PredefinedMenuItem};
 
         let menu = Menu::new();
@@ -396,7 +393,8 @@ mod tests {
             let mut manager = TrayIconManager::new(state, rx);
 
             // Send an update
-            tx.send(TrayUpdate::SetTitle("🍅 15:30".to_string())).unwrap();
+            tx.send(TrayUpdate::SetTitle("🍅 15:30".to_string()))
+                .unwrap();
 
             // Process it
             assert!(manager.process_pending_update());
@@ -410,7 +408,7 @@ mod tests {
             let (tx, rx) = unbounded();
             let state = TimerState::new(PomodoroConfig::default());
             let mut manager = TrayIconManager::new(state, rx);
-            
+
             // Mark as initialized first
             manager.initialized = true;
             assert!(manager.is_initialized());

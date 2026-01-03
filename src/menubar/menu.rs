@@ -84,7 +84,7 @@ impl MenuBuilder {
     /// A `MenuConfig` with all menu items configured appropriately.
     pub fn build(&self, state: &TimerState) -> MenuConfig {
         let status_items = self.build_status_items(state);
-        
+
         MenuConfig {
             title: MenuItemConfig::new("ポモドーロタイマー", false),
             status_items,
@@ -103,7 +103,10 @@ impl MenuBuilder {
             TimerPhase::Stopped => {
                 items.push(MenuItemConfig::new("停止中", false));
             }
-            TimerPhase::Working | TimerPhase::Breaking | TimerPhase::LongBreaking | TimerPhase::Paused => {
+            TimerPhase::Working
+            | TimerPhase::Breaking
+            | TimerPhase::LongBreaking
+            | TimerPhase::Paused => {
                 // Task name (if any)
                 if let Some(ref task_name) = state.task_name {
                     let phase_text = match state.phase {
@@ -112,7 +115,10 @@ impl MenuBuilder {
                         TimerPhase::Paused => "一時停止",
                         TimerPhase::Stopped => "停止中",
                     };
-                    items.push(MenuItemConfig::new(format!("{}: {}", phase_text, task_name), false));
+                    items.push(MenuItemConfig::new(
+                        format!("{}: {}", phase_text, task_name),
+                        false,
+                    ));
                 }
 
                 // Remaining time

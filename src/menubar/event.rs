@@ -129,14 +129,14 @@ impl EventHandler {
     /// The action to perform, or `None` if the item doesn't trigger an action.
     pub fn handle_click(&self, item_id: MenuItemId) -> Option<MenuAction> {
         let action = item_id.to_action();
-        
+
         if let Some(ref action) = action {
             tracing::info!(
                 action = %action,
                 "メニューバーからアクションを受信"
             );
         }
-        
+
         action
     }
 
@@ -269,14 +269,14 @@ mod tests {
         #[test]
         fn test_hash() {
             use std::collections::HashSet;
-            
+
             let mut set = HashSet::new();
             set.insert(MenuItemId::Pause);
             set.insert(MenuItemId::Resume);
             set.insert(MenuItemId::Stop);
             set.insert(MenuItemId::Quit);
             set.insert(MenuItemId::Unknown);
-            
+
             assert_eq!(set.len(), 5);
             assert!(set.contains(&MenuItemId::Pause));
         }
