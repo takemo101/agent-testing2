@@ -12,10 +12,11 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 
 /// Represents the current phase of the timer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TimerPhase {
     /// Timer is stopped
+    #[default]
     Stopped,
     /// Currently in a work session
     Working,
